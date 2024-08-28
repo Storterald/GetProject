@@ -96,9 +96,6 @@ function(build_library_from_fixed_url)
                                 ${ARGS_BUILD_ARGS}
                 )
         endif ()
-
-        # Build latest release
-        add_dependencies(${PROJECT_NAME} ${ARGS_LIBRARY_NAME})
 endfunction()
 
 # Downloads and builds a library from the latest release on github

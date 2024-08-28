@@ -3,9 +3,9 @@
 Some utility functions for CMake. All functions use the `cmake_parse_arguments()` function. 
 To call a function the parameter name must be specified.
 
-### Contents
-
-> *get_library.cmake*
+### get_library.cmake
+It is required for `build_library_from_fixed_url()` and `build_library_with_api()` to have the library name added as a
+dependency of your target.
 
 - `get_file_from_fixed_url():` Fetches a file from a defined **URL**.<br>
   Parameters:
