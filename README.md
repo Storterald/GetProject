@@ -4,8 +4,6 @@ Some utility functions for CMake. All functions use the `cmake_parse_arguments()
 To call a function the parameter name must be specified.
 
 ### get_library.cmake
-It is required for `build_library_from_fixed_url()` and `build_library_with_api()` to have the library name added as a
-dependency of your target.
 
 - `get_file_from_fixed_url():` Fetches a file from a defined **URL**.<br>
   Parameters:
@@ -15,6 +13,7 @@ dependency of your target.
   - ***FETCH_NEW:*** If the fetch must be done even if the file already exists.
 - `build_library_from_fixed_url():` Fetches a library and builds it. The library is required to have *CMakeLists.txt*.<br>
   Parameters:
+  - ***TARGET:*** The target that depends on the library.
   - ***URL:*** The URL from where the library will be fetched.
   - ***DIRECTORY:*** The directory where the library directory will be created.
   - ***LIBRARY_NAME:*** The library name, also the name of the directory that will be created inside the directory parameter.
@@ -25,6 +24,7 @@ dependency of your target.
 - `build_library_with_api():` Fetches and builds the latest release of a library from GitHub. Uses the free GitHub API.
   The library is required to have a *CMakeLists.txt*.<br>
   Parameters:
+  - ***TARGET:*** The target that depends on the library.
   - ***PROFILE_NAME:*** The profile name hosting the GitHub repository.
   - ***REPOSITORY_NAME:*** The GitHub repository name.
   - ***DIRECTORY:*** The directory where the library directory will be created.

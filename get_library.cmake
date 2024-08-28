@@ -40,7 +40,7 @@ endfunction()
 # Downloads and builds a library from a fixed url
 function(build_library_from_fixed_url)
         # Parse args
-        set(ONE_VALUE_ARGS URL DIRECTORY LIBRARY_NAME INSTALL_ENABLED FETCH_NEW)
+        set(ONE_VALUE_ARGS TARGET URL DIRECTORY LIBRARY_NAME INSTALL_ENABLED FETCH_NEW)
         set(MULTI_VALUE_ARGS BUILD_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
@@ -96,12 +96,15 @@ function(build_library_from_fixed_url)
                                 ${ARGS_BUILD_ARGS}
                 )
         endif ()
+
+        # Add build as dependency to target
+        add_dependencies(${ARGS_TARGET} ${ARGS_LIBRARY_NAME})
 endfunction()
 
 # Downloads and builds a library from the latest release on github
 function(build_library_with_api)
         # Parse args
-        set(ONE_VALUE_ARGS PROFILE_NAME REPOSITORY_NAME DIRECTORY INSTALL_ENABLED FETCH_NEW)
+        set(ONE_VALUE_ARGS TARGET PROFILE_NAME REPOSITORY_NAME DIRECTORY INSTALL_ENABLED FETCH_NEW)
         set(MULTI_VALUE_ARGS BUILD_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
@@ -143,7 +146,7 @@ function(build_library_with_api)
         include(ExternalProject)
 
         # Fetch latest release
-        build_library_from_fixed_url(
+        build_library_from_fixed_url(TARGET ${ARGS_TARGET}
                 URL "${GITHUB_URL}/archive/refs/tags/${TAG_NAME}.tar.gz"
                 DIRECTORY ${ARGS_DIRECTORY}
                 LIBRARY_NAME ${ARGS_REPOSITORY_NAME}
