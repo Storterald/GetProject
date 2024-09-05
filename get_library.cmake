@@ -11,12 +11,12 @@ function(get_file_from_fixed_url)
                 if (NOT ${ARGS_FETCH_NEW})
                         # Don't run if expected output exists already
                         message(STATUS "Expected output for file '${ARGS_FILE_NAME}' already exists. "
-                                       "Skipping fetching.")
+                                "Skipping fetching.")
                         return()
                 else ()
                         # Delete expected output and run function
                         message(STATUS "Expected output for file '${ARGS_FILE_NAME}' already exists, "
-                                       "but 'FETCH_NEW' was set to true. Deleting file and re-fetching...")
+                                "but 'FETCH_NEW' was set to true. Deleting file and re-fetching...")
                         file(REMOVE "${ARGS_DIRECTORY}/${ARGS_FILE_NAME}")
                 endif ()
         endif ()
@@ -31,7 +31,7 @@ function(get_file_from_fixed_url)
 
         # Check if response is good
         if (NOT RESPONSE EQUAL 0)
-                message(FATAL_ERROR "Failed to fetch file '${ARGS_FILE_NAME}'.")
+                message(FATAL_ERROR "Failed to fetch file '${ARGS_FILE_NAME}', response: '${RESPONSE}'.")
         else ()
                 message(STATUS "Successfully fetched file '${ARGS_FILE_NAME}'.")
         endif ()
@@ -52,12 +52,12 @@ function(build_library_from_fixed_url)
                 if (NOT ${ARGS_FETCH_NEW})
                         # Don't run if expected output exists already
                         message(STATUS "Expected output for library '${ARGS_LIBRARY_NAME}' already exists. "
-                                       "Skipping fetching and building.")
+                                "Skipping fetching and building.")
                         return()
                 else ()
                         # Delete expected output and run function
                         message(STATUS "Expected output for library '${ARGS_LIBRARY_NAME}' already exists, "
-                                       "but 'FETCH_NEW' was set to true. Deleting file and re-fetching...")
+                                "but 'FETCH_NEW' was set to true. Deleting file and re-fetching...")
                         file(REMOVE ${LIBRARY_CMAKE_BINARY_DIR})
                 endif ()
         endif ()
@@ -65,7 +65,7 @@ function(build_library_from_fixed_url)
         # Deleting previous build directory
         if (EXISTS ${LIBRARY_CMAKE_BINARY_DIR})
                 message(STATUS "Found existing binary dir for library '${ARGS_LIBRARY_NAME}'. "
-                               "Deleting it.")
+                        "Deleting it.")
                 file(REMOVE_RECURSE ${LIBRARY_CMAKE_BINARY_DIR})
         endif ()
 
@@ -74,26 +74,26 @@ function(build_library_from_fixed_url)
 
         # Fetch latest release
         if (${ARGS_INSTALL_ENABLED})
-                ExternalProject_Add(${ARGS_LIBRARY_NAME}
+                externalproject_add(${ARGS_LIBRARY_NAME}
                         URL ${ARGS_URL}
                         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
                         PREFIX ${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}
                         CMAKE_ARGS
-                                -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_INSTALL_PREFIX:PATH=${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}
-                                ${ARGS_BUILD_ARGS}
+                        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+                        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                        -DCMAKE_INSTALL_PREFIX:PATH=${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}
+                        ${ARGS_BUILD_ARGS}
                 )
         else ()
-                ExternalProject_Add(${ARGS_LIBRARY_NAME}
+                externalproject_add(${ARGS_LIBRARY_NAME}
                         URL ${ARGS_URL}
                         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
                         PREFIX ${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}
                         INSTALL_COMMAND ${CMAKE_COMMAND} -E echo "Skipping install step."
                         CMAKE_ARGS
-                                -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                ${ARGS_BUILD_ARGS}
+                        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+                        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                        ${ARGS_BUILD_ARGS}
                 )
         endif ()
 
@@ -101,58 +101,134 @@ function(build_library_from_fixed_url)
         add_dependencies(${ARGS_TARGET} ${ARGS_LIBRARY_NAME})
 endfunction()
 
+# Downloads a library from the latest release on github
+function(download_library_with_fixed_url)
+        # Parse args
+        set(ONE_VALUE_ARGS TARGET URL DIRECTORY LIBRARY_NAME FETCH_NEW)
+        set(MULTI_VALUE_ARGS BUILD_ARGS)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
+
+        if (EXISTS "${DIRECTORY}/${LIBRARY_NAME}")
+                if (NOT ${ARGS_FETCH_NEW})
+                        # Don't run if expected output exists already
+                        message(STATUS "Expected output for library '${ARGS_LIBRARY_NAME}' already exists. "
+                                "Skipping download.")
+                        return()
+                else ()
+                        # Delete expected output and run function
+                        message(STATUS "Expected output for library '${ARGS_LIBRARY_NAME}' already exists, "
+                                "but 'FETCH_NEW' was set to true. Deleting files and re-fetching...")
+                        file(REMOVE_RECURSE "${DIRECTORY}/${ARGS_LIBRARY_NAME}")
+                endif ()
+        endif ()
+
+        # Include ExternalProject
+        include(ExternalProject)
+
+        # Fetch git library
+        externalproject_add(${ARGS_LIBRARY_NAME}
+                URL ${ARGS_URL}
+                DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+                PREFIX ${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}
+                CONFIGURE_COMMAND ${CMAKE_COMMAND} -E echo "Skipping configure step."
+                BUILD_COMMAND ${CMAKE_COMMAND} -E echo "Skipping build step."
+                INSTALL_COMMAND ${CMAKE_COMMAND} -E echo "Skipping install step."
+        )
+endfunction()
+
 # Downloads and builds a library from the latest release on github
-function(build_library_with_api)
+function(build_library_with_git)
         # Parse args
         set(ONE_VALUE_ARGS TARGET PROFILE_NAME REPOSITORY_NAME DIRECTORY INSTALL_ENABLED FETCH_NEW)
         set(MULTI_VALUE_ARGS BUILD_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
+        if (EXISTS "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+                if (NOT ${ARGS_FETCH_NEW})
+                        # Don't run if expected output exists already
+                        message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists. "
+                                "Skipping download and build.")
+                        return()
+                else ()
+                        # Delete expected output and run function
+                        message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists, "
+                                "but 'FETCH_NEW' was set to true. Deleting files and re-fetching...")
+                        file(REMOVE_RECURSE "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+                endif ()
+        endif ()
+
         # Get github url from profile and repo name
         set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
 
-        # Get github repo API URL
-        string(REPLACE "github.com" "api.github.com/repos" API_URL ${GITHUB_URL})
+        # Include git utils
+        include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/git_utils.cmake)
 
-        # Gets a repo's info with the github API
-        get_file_from_fixed_url(
-                URL "${API_URL}/releases/latest"
-                DIRECTORY ${CMAKE_BINARY_DIR}
-                FILE_NAME "${ARGS_REPOSITORY_NAME}.json"
-                FETCH_NEW FALSE
+        # Get latest git tag.
+        get_latest_tag(
+                PROFILE_NAME ${ARGS_PROFILE_NAME}
+                REPOSITORY_NAME ${ARGS_REPOSITORY_NAME}
+                OUTPUT_VARIABLE TAG_NAME
         )
-
-        # Read file
-        file(READ "${CMAKE_BINARY_DIR}/${ARGS_REPOSITORY_NAME}.json" API_CONTENT)
-
-        # If previous API call failed
-        if ("${API_CONTENT}" STREQUAL "")
-                message(STATUS "API answer found, but it's empty. Fetching again.")
-                get_file_from_fixed_url(
-                        URL "${API_URL}/releases/latest"
-                        DIRECTORY ${CMAKE_BINARY_DIR}
-                        FILE_NAME "${ARGS_REPOSITORY_NAME}.json"
-                        FETCH_NEW TRUE
-                )
-                file(READ "${CMAKE_BINARY_DIR}/${ARGS_REPOSITORY_NAME}.json" API_CONTENT)
-        endif ()
-
-        # Get tag name
-        string(REGEX MATCH "\"tag_name\": \"([^\"]+)\"" _ ${API_CONTENT})
-        set(TAG_NAME ${CMAKE_MATCH_1})
-        string(REPLACE "\"" "" TAG_NAME ${TAG_NAME})
 
         # Include ExternalProject
         include(ExternalProject)
 
         # Fetch latest release
-        build_library_from_fixed_url(TARGET ${ARGS_TARGET}
+        build_library_from_fixed_url(
+                TARGET ${ARGS_TARGET}
                 URL "${GITHUB_URL}/archive/refs/tags/${TAG_NAME}.tar.gz"
                 DIRECTORY ${ARGS_DIRECTORY}
                 LIBRARY_NAME ${ARGS_REPOSITORY_NAME}
                 INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
                 FETCH_NEW ${ARGS_FETCH_NEW}
                 BUILD_ARGS ${ARGS_BUILD_ARGS}
+        )
+endfunction()
+
+# Downloads and builds a library from the latest release on github
+function(download_library_with_git)
+        # Parse args
+        set(ONE_VALUE_ARGS TARGET PROFILE_NAME REPOSITORY_NAME DIRECTORY FETCH_NEW)
+        set(MULTI_VALUE_ARGS)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
+
+        if (EXISTS "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+                if (NOT ${ARGS_FETCH_NEW})
+                        # Don't run if expected output exists already
+                        message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists. "
+                                "Skipping download.")
+                        return()
+                else ()
+                        # Delete expected output and run function
+                        message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists, "
+                                "but 'FETCH_NEW' was set to true. Deleting files and re-fetching...")
+                        file(REMOVE_RECURSE "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+                endif ()
+        endif ()
+
+        # Get github url from profile and repo name
+        set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
+
+        # Include git utils
+        include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/git_utils.cmake)
+
+        # Get latest git tag.
+        get_latest_tag(
+                PROFILE_NAME ${ARGS_PROFILE_NAME}
+                REPOSITORY_NAME ${ARGS_REPOSITORY_NAME}
+                OUTPUT_VARIABLE TAG_NAME
+        )
+
+        # Include ExternalProject
+        include(ExternalProject)
+
+        # Fetch latest release
+        download_library_with_fixed_url(
+                TARGET ${ARGS_TARGET}
+                URL "${GITHUB_URL}/archive/refs/tags/${TAG_NAME}.tar.gz"
+                DIRECTORY ${ARGS_DIRECTORY}
+                LIBRARY_NAME ${ARGS_REPOSITORY_NAME}
+                FETCH_NEW ${ARGS_FETCH_NEW}
         )
 endfunction()
 
