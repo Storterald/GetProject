@@ -108,7 +108,11 @@ function(download_library_with_fixed_url)
         set(MULTI_VALUE_ARGS BUILD_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        if (EXISTS "${DIRECTORY}/${LIBRARY_NAME}")
+        # Output directory
+        set(OUT_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
+        set(TMP_DIR "${OUT_DIR}-tmp")
+
+        if (EXISTS ${OUT_DIR})
                 if (NOT ${ARGS_FETCH_NEW})
                         # Don't run if expected output exists already
                         message(STATUS "Expected output for library '${ARGS_LIBRARY_NAME}' already exists. "
@@ -118,7 +122,7 @@ function(download_library_with_fixed_url)
                         # Delete expected output and run function
                         message(STATUS "Expected output for library '${ARGS_LIBRARY_NAME}' already exists, "
                                 "but 'FETCH_NEW' was set to true. Deleting files and re-fetching...")
-                        file(REMOVE_RECURSE "${DIRECTORY}/${ARGS_LIBRARY_NAME}")
+                        file(REMOVE_RECURSE "${OUT_DIR}")
                 endif ()
         endif ()
 
@@ -129,10 +133,16 @@ function(download_library_with_fixed_url)
         externalproject_add(${ARGS_LIBRARY_NAME}
                 URL ${ARGS_URL}
                 DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-                PREFIX ${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}
-                CONFIGURE_COMMAND ${CMAKE_COMMAND} -E echo "Skipping configure step."
+                PREFIX ${TMP_DIR}
+                CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy_directory "${TMP_DIR}/src/${ARGS_LIBRARY_NAME}" ${OUT_DIR}
                 BUILD_COMMAND ${CMAKE_COMMAND} -E echo "Skipping build step."
                 INSTALL_COMMAND ${CMAKE_COMMAND} -E echo "Skipping install step."
+        )
+
+        # Delete temporary directory
+        add_custom_command(
+                TARGET ${ARGS_LIBRARY_NAME}
+                COMMAND ${CMAKE_COMMAND} -E rm -rf ${TMP_DIR}
         )
 endfunction()
 
@@ -167,6 +177,7 @@ function(build_library_with_git)
         get_latest_tag(
                 PROFILE_NAME ${ARGS_PROFILE_NAME}
                 REPOSITORY_NAME ${ARGS_REPOSITORY_NAME}
+                CLEAR FALSE
                 OUTPUT_VARIABLE TAG_NAME
         )
 
@@ -216,6 +227,7 @@ function(download_library_with_git)
         get_latest_tag(
                 PROFILE_NAME ${ARGS_PROFILE_NAME}
                 REPOSITORY_NAME ${ARGS_REPOSITORY_NAME}
+                CLEAR FALSE
                 OUTPUT_VARIABLE TAG_NAME
         )
 

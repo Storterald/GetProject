@@ -65,4 +65,5 @@ Requires the `git_utils.cmake` file.
   Parameters:
   - ***PROFILE_NAME:*** The profile name hosting the GitHub repository.
   - ***REPOSITORY_NAME:*** The GitHub repository name.
+  - ***CLEAR***: If the temporary directory containing the cloned repo needs to be deleted.
   - ***OUTPUT_VARIABLE:*** Where the tag name will be stored.
