@@ -196,6 +196,41 @@ function(build_library_with_git)
         )
 endfunction()
 
+function(download_library_with_branch)
+        # Parse args
+        set(ONE_VALUE_ARGS TARGET PROFILE_NAME REPOSITORY_NAME BRANCH DIRECTORY FETCH_NEW)
+        set(MULTI_VALUE_ARGS)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
+
+        if (EXISTS "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+                if (NOT ${ARGS_FETCH_NEW})
+                        # Don't run if expected output exists already
+                        message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists. "
+                                "Skipping download.")
+                        return()
+                else ()
+                        # Delete expected output and run function
+                        message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists, "
+                                "but 'FETCH_NEW' was set to true. Deleting files and re-fetching...")
+                        file(REMOVE_RECURSE "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+                endif ()
+        endif ()
+
+        # Get github url from profile and repo name
+        set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
+
+        # Include FetchContent
+        include(FetchContent)
+
+        # Fetch latest release
+        fetchcontent_declare(${ARGS_REPOSITORY_NAME}
+                GIT_REPOSITORY ${GITHUB_URL}
+                GIT_TAG ${ARGS_BRANCH}
+                SOURCE_DIR "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
+        )
+        fetchcontent_makeavailable(${ARGS_REPOSITORY_NAME})
+endfunction()
+
 # Downloads and builds a library from the latest release on github
 function(download_library_with_git)
         # Parse args
