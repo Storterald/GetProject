@@ -153,7 +153,7 @@ function(build_library_with_git)
         set(MULTI_VALUE_ARGS BUILD_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        if (EXISTS "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+        if (EXISTS "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}")
                 if (NOT ${ARGS_FETCH_NEW})
                         # Don't run if expected output exists already
                         message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists. "
@@ -163,7 +163,7 @@ function(build_library_with_git)
                         # Delete expected output and run function
                         message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists, "
                                 "but 'FETCH_NEW' was set to true. Deleting files and re-fetching...")
-                        file(REMOVE_RECURSE "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+                        file(REMOVE_RECURSE "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}")
                 endif ()
         endif ()
 
@@ -205,10 +205,10 @@ function(download_library_with_branch)
         # Get github url from profile and repo name
         set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
 
-        if (EXISTS "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+        if (EXISTS "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}")
                 execute_process(
                         COMMAND git pull ${GITHUB_URL}
-                        WORKING_DIRECTORY "${DIRECTORY}/${ARGS_REPOSITORY_NAME}"
+                        WORKING_DIRECTORY "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
                 )
         else ()
                 execute_process(
@@ -224,7 +224,7 @@ function(download_library_with_git)
         set(MULTI_VALUE_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        if (EXISTS "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+        if (EXISTS "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}")
                 if (NOT ${ARGS_FETCH_NEW})
                         # Don't run if expected output exists already
                         message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists. "
@@ -234,7 +234,7 @@ function(download_library_with_git)
                         # Delete expected output and run function
                         message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists, "
                                 "but 'FETCH_NEW' was set to true. Deleting files and re-fetching...")
-                        file(REMOVE_RECURSE "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+                        file(REMOVE_RECURSE "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}")
                 endif ()
         endif ()
 

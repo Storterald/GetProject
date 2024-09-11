@@ -39,7 +39,7 @@ function(get_latest_tag)
         )
 
         # Delete downloaded content
-        if (CLEAR)
+        if (ARGS_CLEAR)
                 file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${TMP_DIR}")
         endif ()
 
