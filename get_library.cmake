@@ -220,15 +220,9 @@ function(download_library_with_branch)
         set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
 
         # Include FetchContent
-        include(FetchContent)
-
-        # Fetch latest release
-        fetchcontent_declare(${ARGS_REPOSITORY_NAME}
-                GIT_REPOSITORY ${GITHUB_URL}
-                GIT_TAG ${ARGS_BRANCH}
-                SOURCE_DIR "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
+        execute_process(
+                COMMAND git clone ${GITHUB_URL} --branch ${ARGS_BRANCH} --single-branch "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
         )
-        fetchcontent_makeavailable(${ARGS_REPOSITORY_NAME})
 endfunction()
 
 # Downloads and builds a library from the latest release on github
