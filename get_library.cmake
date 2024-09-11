@@ -105,7 +105,7 @@ endfunction()
 function(download_library_with_fixed_url)
         # Parse args
         set(ONE_VALUE_ARGS TARGET URL DIRECTORY LIBRARY_NAME FETCH_NEW)
-        set(MULTI_VALUE_ARGS BUILD_ARGS)
+        set(MULTI_VALUE_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
         # Output directory
