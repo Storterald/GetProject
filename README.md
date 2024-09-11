@@ -42,7 +42,7 @@ Requires the `git_utils.cmake` file.
   - ***FETCH_NEW:*** If the fetch must be done even if the library already exists, required when building with a compiler
     that has a different output file format.
   - ***BUILD_ARGS:*** Optional extra args to pass to ExternalProject when building the library.
-- `download_library_with_git():` Fetches the latest release of a library from GitHub. Uses **git**.<br>
+- `download_library_with_git():` Fetches the latest ***release*** of a library from GitHub. Uses **git**.<br>
     Parameters:
   - ***TARGET:*** The target that depends on the library.
   - ***PROFILE_NAME:*** The profile name hosting the git repository.
@@ -50,15 +50,13 @@ Requires the `git_utils.cmake` file.
   - ***DIRECTORY:*** The directory where the library directory will be created.
   - ***FETCH_NEW:*** If the fetch must be done even if the library already exists, required when building with a compiler
     that has a different output file format.
-- `download_library_with_branch():` Fetches the latest release of a library from GitHub via the given branch.<br>
+- `download_library_with_branch():` Fetches a library with the given branch. Uses **git**.<br>
     Parameters:
   - ***TARGET:*** The target that depends on the library.
   - ***PROFILE_NAME:*** The profile name hosting the git repository.
   - ***REPOSITORY_NAME:*** The git repository name.
   - ***BRANCH_NAME:*** The git branch name.
   - ***DIRECTORY:*** The directory where the library directory will be created.
-  - ***FETCH_NEW:*** If the fetch must be done even if the library already exists, required when building with a compiler
-    that has a different output file format.
 - `get_repo_file():` Fetches a file from a GitHub repository. Requires the branch name.<br>
   Parameters:
   - ***PROFILE_NAME:*** The profile name hosting the git repository.

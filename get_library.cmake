@@ -198,34 +198,26 @@ endfunction()
 
 function(download_library_with_branch)
         # Parse args
-        set(ONE_VALUE_ARGS TARGET PROFILE_NAME REPOSITORY_NAME BRANCH DIRECTORY FETCH_NEW)
+        set(ONE_VALUE_ARGS TARGET PROFILE_NAME REPOSITORY_NAME BRANCH DIRECTORY)
         set(MULTI_VALUE_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
-
-        if (EXISTS "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
-                if (NOT ${ARGS_FETCH_NEW})
-                        # Don't run if expected output exists already
-                        message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists. "
-                                "Skipping download.")
-                        return()
-                else ()
-                        # Delete expected output and run function
-                        message(STATUS "Expected output for library '${ARGS_REPOSITORY_NAME}' already exists, "
-                                "but 'FETCH_NEW' was set to true. Deleting files and re-fetching...")
-                        file(REMOVE_RECURSE "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
-                endif ()
-        endif ()
 
         # Get github url from profile and repo name
         set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
 
-        # Include FetchContent
-        execute_process(
-                COMMAND git clone ${GITHUB_URL} --branch ${ARGS_BRANCH} --single-branch "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
-        )
+        if (EXISTS "${DIRECTORY}/${ARGS_REPOSITORY_NAME}")
+                execute_process(
+                        COMMAND git pull ${GITHUB_URL}
+                        WORKING_DIRECTORY "${DIRECTORY}/${ARGS_REPOSITORY_NAME}"
+                )
+        else ()
+                execute_process(
+                        COMMAND git clone ${GITHUB_URL} --branch ${ARGS_BRANCH} --single-branch "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
+                )
+        endif ()
 endfunction()
 
-# Downloads and builds a library from the latest release on github
+# Downloads a library from the latest release on github
 function(download_library_with_git)
         # Parse args
         set(ONE_VALUE_ARGS TARGET PROFILE_NAME REPOSITORY_NAME DIRECTORY FETCH_NEW)
