@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
+# Gets the last published tag of a repository
 function(get_latest_tag)
         # Parse args
         set(ONE_VALUE_ARGS PROFILE_NAME REPOSITORY_NAME CLEAR OUTPUT_VARIABLE)
