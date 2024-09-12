@@ -23,7 +23,6 @@ download_file_from_url(
         HASH
         # The file hash type.
         HASH_TYPE
-
 )
 ```
 - `download_from_url():` Fetches a library from the given **URL**.<br>
