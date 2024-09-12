@@ -183,15 +183,23 @@ function(build_from_url)
         # Constants
         set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${CMAKE_BINARY_DIR}/get_library/${ARGS_LIBRARY_NAME}/cache")
-        set(BUILD_DIR"${LIBRARY_DIR}/build/${CMAKE_GENERATOR}-${CMAKE_BUILD_TYPE}")
+        set(BUILD_DIR "${LIBRARY_DIR}/build/${CMAKE_GENERATOR}-${CMAKE_BUILD_TYPE}")
+        set(DEPENDENCY_FILE "${CMAKE_BINARY_DIR}/get_library/${ARGS_LIBRARY_NAME}/${ARGS_LIBRARY_NAME}.stamp")
+
+        # Script arguments
         set(BUILD_ARGS
+                -G "${CMAKE_GENERATOR}"
+                -S ${LIBRARY_DIR}
+                -B ${BUILD_DIR}
                 -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                 -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                -DCMAKE_INSTALL_PREFIX:PATH=${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}
+                -DCMAKE_INSTALL_PREFIX:PATH=${LIBRARY_DIR}
                 ${ARGS_BUILD_ARGS}
         )
         if (${ARGS_INSTALL_ENABLED})
-                set(INSTALL_COMMAND --target install)
+                set(INSTALL_COMMAND --build ${BUILD_DIR} --target install)
+        else ()
+                set(INSTALL_COMMAND -E echo "Skipping install step.")
         endif ()
 
         # Download library at configure time
@@ -201,21 +209,24 @@ function(build_from_url)
                 LIBRARY_NAME ${ARGS_LIBRARY_NAME}
         )
 
-        # Library target
-        add_custom_target(${ARGS_LIBRARY_NAME})
-
         # The hash file can be used to determine if the build needs to happen
         file(GLOB CACHE_FILE "${CACHE_DIR}/**")
 
         # Configure, build and install the library
-        add_custom_command(TARGET ${ARGS_TARGET}
+        add_custom_command(OUTPUT ${DEPENDENCY_FILE}
                 COMMAND ${CMAKE_COMMAND} -E echo "Configuring ${ARGS_LIBRARY_NAME}..."
-                COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" ${BUILD_DIR} ${BUILD_ARGS}
+                COMMAND ${CMAKE_COMMAND} . ${BUILD_ARGS}
                 COMMAND ${CMAKE_COMMAND} -E echo "Building ${ARGS_LIBRARY_NAME}..."
-                COMMAND ${CMAKE_COMMAND} --build . ${INSTALL_COMMAND}
+                COMMAND ${CMAKE_COMMAND} --build ${BUILD_DIR}
+                COMMAND ${CMAKE_COMMAND} ${INSTALL_COMMAND}
+                COMMAND ${CMAKE_COMMAND} -E touch ${DEPENDENCY_FILE}
                 WORKING_DIRECTORY ${LIBRARY_DIR}
                 DEPENDS ${CACHE_FILE}
         )
+
+        # Add dependency to input target
+        add_custom_target(${ARGS_LIBRARY_NAME} ALL DEPENDS ${DEPENDENCY_FILE})
+        add_dependencies(${ARGS_TARGET} ${ARGS_LIBRARY_NAME})
 endfunction()
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -243,13 +254,9 @@ function(download_file_from_branch)
                 message(FATAL_ERROR "DIRECTORY is a mandatory parameter of download_file_from_branch.")
         endif ()
 
-        # Gets file name from file path
-        get_filename_component(FILE_NAME ${ARGS_FILE_PATH} NAME)
-
         download_file_from_url(
                 URL "https://raw.githubusercontent.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}/${ARGS_BRANCH}/${ARGS_FILE_PATH}"
                 DIRECTORY "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
-                FILE_NAME ${FILE_NAME}
         )
 endfunction()
 
