@@ -208,7 +208,7 @@ function(build_from_url)
         file(GLOB CACHE_FILE "${CACHE_DIR}/**")
 
         # Configure, build and install the library
-        add_custom_command(TARGET ${ARGS_LIBRARY_NAME}
+        add_custom_command(TARGET ${ARGS_TARGET}
                 COMMAND ${CMAKE_COMMAND} -E echo "Configuring ${ARGS_LIBRARY_NAME}..."
                 COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" ${BUILD_DIR} ${BUILD_ARGS}
                 COMMAND ${CMAKE_COMMAND} -E echo "Building ${ARGS_LIBRARY_NAME}..."
@@ -216,8 +216,6 @@ function(build_from_url)
                 WORKING_DIRECTORY ${LIBRARY_DIR}
                 DEPENDS ${CACHE_FILE}
         )
-
-        add_dependencies(${ARGS_TARGET} ${ARGS_LIBRARY_NAME})
 endfunction()
 
 # ----------------------------------------------------------------------------------------------------------------------
