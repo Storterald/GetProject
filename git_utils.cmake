@@ -7,41 +7,55 @@ function(get_latest_tag)
         set(MULTI_VALUE_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        # Get github url from profile and repo name
-        set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
+        # Validate parameters
+        if (NOT ARGS_PROFILE_NAME)
+                message(FATAL_ERROR "PROFILE_NAME is a mandatory parameter of get_latest_tag.")
+        endif ()
+        if (NOT ARGS_REPOSITORY_NAME)
+                message(FATAL_ERROR "REPOSITORY_NAME is a mandatory parameter of get_latest_tag.")
+        endif ()
 
-        # Temporary directory name
-        set(TMP_DIR tmp_${ARGS_REPOSITORY_NAME})
+        # Constants
+        set(GIT_UTILS_DIR "${CMAKE_BINARY_DIR}/git_utils")
+        set(CACHE_DIR "${GIT_UTILS_DIR}/${ARGS_REPOSITORY_NAME}")
+        set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}.git")
+
+        # Create git_utils internal directory
+        if (NOT EXISTS ${GIT_UTILS_DIR})
+                file(MAKE_DIRECTORY ${GIT_UTILS_DIR})
+        endif ()
 
         # False if CLEAR was false in a previous call.
-        if (NOT EXISTS ${TMP_DIR})
+        if (NOT EXISTS ${CACHE_DIR})
+                file(MAKE_DIRECTORY ${CACHE_DIR})
+
                 # Clone repo with lowest depth possible
                 execute_process(
-                        COMMAND git clone --depth 1 --no-checkout ${GITHUB_URL} ${TMP_DIR}
-                        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+                        COMMAND git clone --depth 1 --no-checkout ${GITHUB_URL} "."
+                        WORKING_DIRECTORY ${CACHE_DIR}
                 )
 
-                # Fetch all tags
+                # Fetch tags
                 execute_process(
                         COMMAND git fetch --tags --depth 1
-                        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${TMP_DIR}"
+                        WORKING_DIRECTORY ${CACHE_DIR}
                 )
         else ()
-                message(STATUS "git_utils::get_latest_tag() temporary directory for repository '${ARGS_REPOSITORY_NAME}' "
+                message(STATUS "git_utils::get_latest_tag() cached directory for repository '${ARGS_REPOSITORY_NAME}' "
                         "already exists, not fetching.")
         endif ()
 
         # Sort tags by creation date
         execute_process(
                 COMMAND git for-each-ref --sort=-creatordate --format "%(refname:short)" refs/tags
-                WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${TMP_DIR}"
+                WORKING_DIRECTORY ${CACHE_DIR}
                 OUTPUT_VARIABLE TAG_LIST
                 OUTPUT_STRIP_TRAILING_WHITESPACE
         )
 
         # Delete downloaded content
         if (ARGS_CLEAR)
-                file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${TMP_DIR}")
+                file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${CACHE_DIR}")
         endif ()
 
         # Checking if tag list was obtained correctly
