@@ -97,9 +97,6 @@ download_latest_release(
         DIRECTORY
 )
 ```
-  - ***PROFILE_NAME:*** The profile name hosting the git repository.
-  - ***REPOSITORY_NAME:*** The git repository name.
-  - ***DIRECTORY:*** The directory where the library directory will be created.
 - `build_latest_release():` Fetches and builds the latest release of a library from GitHub. Uses **git**.
   The library is required to have a *CMakeLists.txt*.<br>
 ```cmake
