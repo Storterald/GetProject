@@ -126,7 +126,7 @@ function(download_from_url)
                 # If library directory exists and it's not empty
                 if (NOT EXISTS ${OUTPUT_DIR} OR ${FILE_COUNT} EQUAL 0)
                         message(STATUS "Old and new downloaded file hashes match, "
-                                "but '${ARGS_LIBRARY_NAME}' directory does not exist / is empty,"
+                                "but '${ARGS_LIBRARY_NAME}' directory does not exist / is empty, "
                                 "extracting...")
                 else ()
 
