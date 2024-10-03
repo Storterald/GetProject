@@ -263,7 +263,7 @@ endfunction()
 # Clones a library or updates it if already cloned
 function(download_from_branch)
         # Parse args
-        set(ONE_VALUE_ARGS PROFILE_NAME REPOSITORY_NAME BRANCH DIRECTORY)
+        set(ONE_VALUE_ARGS PROFILE_NAME REPOSITORY_NAME BRANCH DIRECTORY KEEP_UPDATED)
         set(MULTI_VALUE_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
@@ -285,10 +285,12 @@ function(download_from_branch)
         set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
 
         if (EXISTS "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}")
-                execute_process(
-                        COMMAND git pull ${GITHUB_URL}
-                        WORKING_DIRECTORY "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
-                )
+                if (ARGS_KEEP_UPDATED)
+                        execute_process(
+                                COMMAND git pull ${GITHUB_URL}
+                                WORKING_DIRECTORY "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
+                        )
+                endif()
         else ()
                 execute_process(
                         COMMAND git clone ${GITHUB_URL} --branch ${ARGS_BRANCH} --depth 1 "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
