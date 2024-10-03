@@ -84,6 +84,12 @@ download_from_branch(
         BRANCH_NAME
         # The directory where the library directory will be created.
         DIRECTORY
+
+        # --------- Optional parameters ---------
+
+        # When set to 'ON', if the library has already been cloned, a git
+        # pull will be done.
+        KEEP_UPDATED
 )
 ```
 - `download_latest_release():` Fetches the latest ***release*** of a library from GitHub. Uses **git**.<br>
