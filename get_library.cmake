@@ -1,33 +1,111 @@
 cmake_minimum_required(VERSION 3.5)
 
 # ----------------------------------------------------------------------------------------------------------------------
-# URL FUNCTIONS
+# HELPER FUNCTIONS
 # ----------------------------------------------------------------------------------------------------------------------
 
-# Fetches a file from a URL
-function(download_file_from_url)
-        # Parse args
-        set(ONE_VALUE_ARGS URL DIRECTORY HASH HASH_TYPE)
-        set(MULTI_VALUE_ARGS)
-        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
+function(get_latest_tag)
+        set(ONE_VALUE_ARGS
+                GIT_REPOSITORY
+                LIBRARY_NAME
+                CLEAR
+                OUTPUT_VARIABLE)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        # Validate parameters
-        if (NOT ARGS_URL)
-                message(FATAL_ERROR "URL is a mandatory parameter of download_file_from_url.")
+        if (NOT ARGS_GIT_REPOSITORY)
+                message(FATAL_ERROR "GIT_REPOSITORY must be given to get_latest_tag().")
         endif ()
+
+        if (NOT ARGS_LIBRARY_NAME)
+                message(FATAL_ERROR "LIBRARY_NAME must be given to get_latest_tag().")
+        endif ()
+
+        # Constants
+        set(GIT_UTILS_DIR "${CMAKE_BINARY_DIR}/git_utils")
+        set(CACHE_DIR "${GIT_UTILS_DIR}/${ARGS_LIBRARY_NAME}")
+
+        # Create git_utils internal directory if it does not exist
+        if (NOT EXISTS ${GIT_UTILS_DIR})
+                file(MAKE_DIRECTORY ${GIT_UTILS_DIR})
+        endif ()
+
+        if (NOT EXISTS ${CACHE_DIR})
+                file(MAKE_DIRECTORY ${CACHE_DIR})
+
+                # Clone repo with lowest depth possible and fetch tags, two
+                # commands are needed as cmake does not wait for the first command
+                # to finish execution before calling the second one
+                execute_process(
+                        COMMAND git clone --depth 1 --no-checkout ${ARGS_GIT_REPOSITORY} "."
+                        WORKING_DIRECTORY ${CACHE_DIR}
+                )
+                execute_process(
+                        COMMAND git fetch --tags --depth 1
+                        WORKING_DIRECTORY ${CACHE_DIR}
+                )
+        else ()
+                if (CMAKE_VERBOSE_MAKEFILE)
+                        message(STATUS "Cached folder for repository '${ARGS_GIT_REPOSITORY}', "
+                                "executing only 'git pull'.")
+                endif ()
+                execute_process(
+                        COMMAND git pull
+                        WORKING_DIRECTORY ${CACHE_DIR}
+                )
+        endif ()
+
+        # Sort tags by creation date
+        execute_process(
+                COMMAND git for-each-ref --sort=-creatordate --format "%(refname:short)" refs/tags
+                WORKING_DIRECTORY ${CACHE_DIR}
+                OUTPUT_VARIABLE TAG_LIST
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+
+        # Delete downloaded content
+        if (ARGS_CLEAR)
+                file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/${CACHE_DIR}")
+        endif ()
+
+        # Checking if tag list was obtained correctly
+        if (NOT TAG_LIST)
+                message(FATAL_ERROR "Failed to obtain tag list.")
+        endif ()
+
+        # Get the latest tag from the tag list
+        string(REGEX MATCH "([^ \n]+)" TAG_NAME ${TAG_LIST})
+        set(TAG_NAME "${CMAKE_MATCH_1}")
+
+        if (CMAKE_VERBOSE_MAKEFILE)
+                message(STATUS "Latest tag for repository '${ARGS_GIT_REPOSITORY}' "
+                        "has been found to be '${TAG_NAME}'")
+        endif ()
+
+        set(${ARGS_OUTPUT_VARIABLE} ${TAG_NAME} PARENT_SCOPE)
+endfunction()
+
+function(download_file)
+        set(ONE_VALUE_ARGS
+                URL
+                DIRECTORY
+                HASH
+                HASH_TYPE)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
+
+        if (NOT ARGS_URL)
+                message(FATAL_ERROR "URL must be given to download_file().")
+        endif ()
+
         if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY is a mandatory parameter of download_file_from_url.")
+                message(FATAL_ERROR "DIRECTORY must be given to download_file().")
         endif ()
 
         # Get archive name and extension
         get_filename_component(FILE_NAME ${ARGS_URL} NAME_WE)
         get_filename_component(FILE_EXT ${ARGS_URL} EXT)
 
-        # Constants
         set(FILE_PATH "${ARGS_DIRECTORY}/${FILE_NAME}${FILE_EXT}")
 
-        # Download file
-        message(STATUS "Fetching file '${FILE_NAME}${FILE_EXT}'...")
         if (ARGS_HASH)
                 # Check if HASH_TYPE parameter was given
                 if (NOT ARGS_HASH_TYPE)
@@ -36,15 +114,13 @@ function(download_file_from_url)
                 endif ()
 
                 # Download file with hash comparison
-                file(DOWNLOAD ${ARGS_URL}
-                        ${FILE_PATH}
+                file(DOWNLOAD ${ARGS_URL} ${FILE_PATH}
                         EXPECTED_HASH ${ARGS_HASH_TYPE}=${ARGS_HASH}
                         STATUS RESPONSE
                 )
         else ()
-                # Download file with hash comparison
-                file(DOWNLOAD ${ARGS_URL}
-                        ${FILE_PATH}
+                # Download file without hash comparison
+                file(DOWNLOAD ${ARGS_URL} ${FILE_PATH}
                         STATUS RESPONSE
                 )
         endif ()
@@ -53,36 +129,37 @@ function(download_file_from_url)
         if (NOT RESPONSE EQUAL 0)
                 message(FATAL_ERROR "Failed to download file '${FILE_NAME}${FILE_EXT}', "
                         "response: '${RESPONSE}'.")
-        else ()
-                message(STATUS "Successfully downloaded file '${FILE_NAME}${FILE_EXT}'.")
-        endif ()
+        elseif (CMAKE_VERBOSE_MAKEFILE)
+                message(STATUS "Correctly downloaded file '${FILE_NAME}${FILE_EXT}'.")
+        endif()
 endfunction()
 
-# Downloads a library from the latest release on github
-function(download_from_url)
-        # Parse args
-        set(ONE_VALUE_ARGS URL DIRECTORY LIBRARY_NAME)
-        set(MULTI_VALUE_ARGS)
-        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
+function(download_library)
+        set(ONE_VALUE_ARGS
+                URL
+                DIRECTORY
+                LIBRARY_NAME)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        # Validate parameters
         if (NOT ARGS_URL)
-                message(FATAL_ERROR "URL is a mandatory parameter of download_from_url.")
-        endif ()
-        if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY is a mandatory parameter of download_from_url.")
-        endif ()
-        if (NOT ARGS_LIBRARY_NAME)
-                message(FATAL_ERROR "LIBRARY_NAME is a mandatory parameter of download_from_url.")
+                message(FATAL_ERROR "URL must be given to download_library().")
         endif ()
 
-        # Constants
+        if (NOT ARGS_DIRECTORY)
+                message(FATAL_ERROR "DIRECTORY must be given to download_library().")
+        endif ()
+
+        if (NOT ARGS_LIBRARY_NAME)
+                message(FATAL_ERROR "LIBRARY_NAME must be given to download_library().")
+        endif ()
+
+        # Directories
         set(GET_LIBRARY_DIR "${CMAKE_BINARY_DIR}/get_library")
-        set(LIBRARY_DIR "${GET_LIBRARY_DIR}/${ARGS_LIBRARY_NAME}")
-        set(LIBRARY_CACHE_DIR "${LIBRARY_DIR}/cache")
-        set(LIBRARY_ARCHIVE_DIR "${LIBRARY_DIR}/archive")
-        set(TMP_DIR "${LIBRARY_DIR}/.tmp")
-        set(OUTPUT_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "${GET_LIBRARY_DIR}/${ARGS_LIBRARY_NAME}")
+        set(LIBRARY_CACHE_DIR "${INTERNAL_LIBRARY_DIR}/cache")
+        set(LIBRARY_ARCHIVE_DIR "${INTERNAL_LIBRARY_DIR}/archive")
+        set(TMP_DIR "${INTERNAL_LIBRARY_DIR}/.tmp")
+        set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
 
         # Create get_library internal directory
         if (NOT EXISTS ${GET_LIBRARY_DIR})
@@ -90,8 +167,8 @@ function(download_from_url)
         endif ()
 
         # Create library internal directory
-        if (NOT EXISTS ${LIBRARY_DIR})
-                file(MAKE_DIRECTORY ${LIBRARY_DIR})
+        if (NOT EXISTS ${INTERNAL_LIBRARY_DIR})
+                file(MAKE_DIRECTORY ${INTERNAL_LIBRARY_DIR})
                 file(MAKE_DIRECTORY ${LIBRARY_CACHE_DIR})
                 file(MAKE_DIRECTORY ${LIBRARY_ARCHIVE_DIR})
         else ()
@@ -106,7 +183,7 @@ function(download_from_url)
         endif ()
 
         # Download library archive
-        download_file_from_url(
+        download_file(
                 URL ${ARGS_URL}
                 DIRECTORY ${LIBRARY_ARCHIVE_DIR}
                 HASH ${HASH}
@@ -120,31 +197,37 @@ function(download_from_url)
         # Don't waste time extracting stuff again if hashes match
         if (HASH AND "${NEW_HASH}" STREQUAL "${HASH}")
                 # Used to check if directory is empty
-                file(GLOB RESULT "${OUTPUT_DIR}/**")
+                file(GLOB RESULT "${LIBRARY_DIR}/**")
                 list(LENGTH RESULT FILE_COUNT)
 
                 # If library directory exists and it's not empty
-                if (NOT EXISTS ${OUTPUT_DIR} OR ${FILE_COUNT} EQUAL 0)
-                        message(STATUS "Old and new downloaded file hashes match, "
-                                "but '${ARGS_LIBRARY_NAME}' directory does not exist / is empty, "
-                                "extracting...")
+                if (NOT EXISTS ${LIBRARY_DIR} OR ${FILE_COUNT} EQUAL 0)
+                        if (CMAKE_VERBOSE_MAKEFILE)
+                                message(STATUS "Old and new downloaded file hashes match, "
+                                        "but '${ARGS_LIBRARY_NAME}' directory does not exist / is empty, "
+                                        "extracting...")
+                        endif()
                 else ()
+                        if (CMAKE_VERBOSE_MAKEFILE)
+                                message(STATUS "Old and new downloaded file hashes match. "
+                                        "Not Extracting.")
+                        endif ()
 
-                        message(STATUS "Old and new downloaded file hashes match. "
-                                "Not Extracting.")
                         return()
                 endif ()
         else ()
-                message(STATUS "Old and new downloaded file hashes don't match, "
-                        "extracting...")
+                if(CMAKE_VERBOSE_MAKEFILE)
+                        message(STATUS "Old and new downloaded file hashes don't match, "
+                                "extracting...")
+                endif ()
         endif ()
 
         # Write hash file only if its different
         file(WRITE "${LIBRARY_CACHE_DIR}/${NEW_HASH}")
 
         # Delete old extracted data
-        if (EXISTS ${OUTPUT_DIR})
-                file(REMOVE_RECURSE ${OUTPUT_DIR})
+        if (EXISTS ${LIBRARY_DIR})
+                file(REMOVE_RECURSE ${LIBRARY_DIR})
         endif ()
 
         # Create temporary directory and extract archive there
@@ -153,38 +236,41 @@ function(download_from_url)
 
         # Move the extracted content to library directory
         file(GLOB EXTRACTED_CONTENT "${TMP_DIR}/*/**")
-        file(COPY ${EXTRACTED_CONTENT} DESTINATION ${OUTPUT_DIR})
+        file(COPY ${EXTRACTED_CONTENT} DESTINATION ${LIBRARY_DIR})
 
         # Clean up the temporary directory
         file(REMOVE_RECURSE ${TMP_DIR})
 endfunction()
 
-# Downloads and builds a library from a fixed url
-function(build_from_url)
-        # Parse args
-        set(ONE_VALUE_ARGS TARGET URL DIRECTORY LIBRARY_NAME INSTALL_ENABLED)
-        set(MULTI_VALUE_ARGS BUILD_ARGS)
+function (build_library)
+        set(ONE_VALUE_ARGS
+                TARGET
+                DIRECTORY
+                LIBRARY_NAME
+                INSTALL_ENABLED)
+        set(MULTI_VALUE_ARGS
+                BUILD_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        # Validate parameters
         if (NOT ARGS_TARGET)
-                message(FATAL_ERROR "TARGET is a mandatory parameter of build_from_url.")
+                message(FATAL_ERROR "TARGET must be given to build_library().")
         endif ()
-        if (NOT ARGS_URL)
-                message(FATAL_ERROR "URL is a mandatory parameter of build_from_url.")
-        endif ()
+
         if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY is a mandatory parameter of build_from_url.")
+                message(FATAL_ERROR "DIRECTORY must be given to build_library().")
         endif ()
+
         if (NOT ARGS_LIBRARY_NAME)
-                message(FATAL_ERROR "LIBRARY_NAME is a mandatory parameter of build_from_url.")
+                message(FATAL_ERROR "LIBRARY_NAME must be given to build_library().")
         endif ()
 
         # Constants
-        set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
-        set(CACHE_DIR "${CMAKE_BINARY_DIR}/get_library/${ARGS_LIBRARY_NAME}/cache")
+        set(GET_LIBRARY_DIR "${CMAKE_BINARY_DIR}/get_library")
+        set(INTERNAL_LIBRARY_DIR "${GET_LIBRARY_DIR}/${ARGS_LIBRARY_NAME}")
+        set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/cache")
+        set(DEPENDENCY_FILE "${INTERNAL_LIBRARY_DIR}/${ARGS_LIBRARY_NAME}.stamp")
         set(BUILD_DIR "${LIBRARY_DIR}/build/${CMAKE_GENERATOR}-${CMAKE_BUILD_TYPE}")
-        set(DEPENDENCY_FILE "${CMAKE_BINARY_DIR}/get_library/${ARGS_LIBRARY_NAME}/${ARGS_LIBRARY_NAME}.stamp")
+        set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
 
         # Script arguments
         set(BUILD_ARGS
@@ -196,18 +282,12 @@ function(build_from_url)
                 -DCMAKE_INSTALL_PREFIX:PATH=${LIBRARY_DIR}
                 ${ARGS_BUILD_ARGS}
         )
-        if (${ARGS_INSTALL_ENABLED})
+
+        if (ARGS_INSTALL_ENABLED)
                 set(INSTALL_COMMAND --build ${BUILD_DIR} --target install)
         else ()
                 set(INSTALL_COMMAND -E echo "Skipping install step.")
         endif ()
-
-        # Download library at configure time
-        download_from_url(
-                URL ${ARGS_URL}
-                DIRECTORY ${ARGS_DIRECTORY}
-                LIBRARY_NAME ${ARGS_LIBRARY_NAME}
-        )
 
         # The hash file can be used to determine if the build needs to happen
         file(GLOB CACHE_FILE "${CACHE_DIR}/**")
@@ -225,165 +305,135 @@ function(build_from_url)
         )
 
         # Add dependency to input target
-        add_custom_target(${ARGS_LIBRARY_NAME} ALL DEPENDS ${DEPENDENCY_FILE})
-        add_dependencies(${ARGS_TARGET} ${ARGS_LIBRARY_NAME})
-endfunction()
+        add_custom_target(${ARGS_LIBRARY_NAME}_target ALL DEPENDS ${DEPENDENCY_FILE})
+        add_dependencies(${ARGS_TARGET} ${ARGS_LIBRARY_NAME}_target)
+endfunction ()
 
 # ----------------------------------------------------------------------------------------------------------------------
-# BRANCH FUNCTIONS
+# END-USER FUNCTIONS
 # ----------------------------------------------------------------------------------------------------------------------
 
-# Downloads a file from a repo branch
-function(download_file_from_branch)
-        # Parse args
-        set(ONE_VALUE_ARGS PROFILE_NAME REPOSITORY_NAME BRANCH FILE_PATH DIRECTORY)
-        set(MULTI_VALUE_ARGS)
+function (get_library)
+        set(ONE_VALUE_ARGS
+                TARGET
+                URL
+                LIBRARY_NAME
+                GIT_REPOSITORY
+                DIRECTORY
+                INSTALL_ENABLED
+                DOWNLOAD_ONLY
+                BRANCH
+                KEEP_UPDATED
+                VERSION)
+        set(MULTI_VALUE_ARGS
+                BUILD_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        # Validate parameters
-        if (NOT ARGS_PROFILE_NAME)
-                message(FATAL_ERROR "PROFILE_NAME is a mandatory parameter of download_file_from_branch.")
-        endif ()
-        if (NOT ARGS_REPOSITORY_NAME)
-                message(FATAL_ERROR "REPOSITORY_NAME is a mandatory parameter of download_file_from_branch.")
-        endif ()
-        if (NOT ARGS_BRANCH)
-                message(FATAL_ERROR "BRANCH is a mandatory parameter of download_file_from_branch.")
-        endif ()
         if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY is a mandatory parameter of download_file_from_branch.")
+                message(FATAL_ERROR "DIRECTORY is a mandatory argument of get_library.")
         endif ()
 
-        download_file_from_url(
-                URL "https://raw.githubusercontent.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}/${ARGS_BRANCH}/${ARGS_FILE_PATH}"
-                DIRECTORY "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
-        )
-endfunction()
-
-# Clones a library or updates it if already cloned
-function(download_from_branch)
-        # Parse args
-        set(ONE_VALUE_ARGS PROFILE_NAME REPOSITORY_NAME BRANCH DIRECTORY KEEP_UPDATED)
-        set(MULTI_VALUE_ARGS)
-        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
-
-        # Validate parameters
-        if (NOT ARGS_PROFILE_NAME)
-                message(FATAL_ERROR "PROFILE_NAME is a mandatory parameter of download_from_branch.")
-        endif ()
-        if (NOT ARGS_REPOSITORY_NAME)
-                message(FATAL_ERROR "REPOSITORY_NAME is a mandatory parameter of download_from_branch.")
-        endif ()
-        if (NOT ARGS_BRANCH)
-                message(FATAL_ERROR "BRANCH is a mandatory parameter of download_from_branch.")
-        endif ()
-        if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY is a mandatory parameter of download_from_branch.")
+        if (ARGS_URL AND NOT ARGS_LIBRARY_NAME)
+                message(FATAL_ERROR "LIBRARY_NAME must be given when using the URL argument.")
         endif ()
 
-        # Get github url from profile and repo name
-        set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
+        if (NOT ARGS_URL AND NOT ARGS_GIT_REPOSITORY)
+                message(FATAL_ERROR "Either URL or GIT_REPOSITORY must be given for get_library "
+                        "to do something.")
+        endif ()
 
-        if (EXISTS "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}")
-                if (ARGS_KEEP_UPDATED)
-                        execute_process(
-                                COMMAND git pull ${GITHUB_URL}
-                                WORKING_DIRECTORY "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
-                        )
-                endif()
-        else ()
+        if (NOT ARGS_BRANCH AND NOT "${ARGS_KEEP_UPDATED}" STREQUAL "")
+                message(WARNING "KEEP_UPDATED argument is only used when the BRANCH argument "
+                        "is passed.")
+        endif ()
+
+        if (NOT ARGS_URL AND ARGS_LIBRARY_NAME)
+                message(WARNING "LIBRARY_NAME argument is only used when the URL argument "
+                        "is passed.")
+        endif ()
+
+        if (ARGS_DOWNLOAD_ONLY AND ARGS_BUILD_ARGS)
+                message(WARNING "BUILD_ARGS argument is only used when the DOWNLOAD_ONLY "
+                        "argument is set to OFF.")
+        endif ()
+
+        if (ARGS_GIT_REPOSITORY)
+                # Validate git repository without cloning
                 execute_process(
-                        COMMAND git clone ${GITHUB_URL} --branch ${ARGS_BRANCH} --depth 1 "${ARGS_DIRECTORY}/${ARGS_REPOSITORY_NAME}"
+                        COMMAND git ls-remote ${ARGS_GIT_REPOSITORY}
+                        RESULT_VARIABLE GIT_CHECK_RESULT
+                        OUTPUT_QUIET
+                        ERROR_QUIET
                 )
-        endif ()
-endfunction()
 
-# ----------------------------------------------------------------------------------------------------------------------
-# LATEST PUBLIC RELEASE FUNCTIONS
-# ----------------------------------------------------------------------------------------------------------------------
+                if(NOT GIT_CHECK_RESULT EQUAL 0)
+                        message(FATAL_ERROR "Invalid or inaccessible git repository '${ARGS_GIT_REPOSITORY}'.")
+                endif()
 
-# Downloads a library from the latest release on github
-function(download_latest_release)
-        # Parse args
-        set(ONE_VALUE_ARGS PROFILE_NAME REPOSITORY_NAME DIRECTORY)
-        set(MULTI_VALUE_ARGS)
-        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
-
-        # Validate parameters
-        if (NOT ARGS_PROFILE_NAME)
-                message(FATAL_ERROR "PROFILE_NAME is a mandatory parameter of download_latest_release.")
-        endif ()
-        if (NOT ARGS_REPOSITORY_NAME)
-                message(FATAL_ERROR "REPOSITORY_NAME is a mandatory parameter of download_latest_release.")
-        endif ()
-        if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY is a mandatory parameter of download_latest_release.")
+                string(REGEX REPLACE ".*/([^/]+)\\.git$" "\\1" ARGS_LIBRARY_NAME ${ARGS_GIT_REPOSITORY})
         endif ()
 
-        # Get github url from profile and repo name
-        set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
+        # Put in the ARGS_BRANCH variable the tag
+        if (NOT ARGS_URL AND NOT ARGS_BRANCH)
+                if (ARGS_VERSION)
+                        string(TOUPPER "${ARGS_VERSION}" ARGS_VERSION)
+                else ()
+                        message(WARNING "VERSION argument is missing, downloading latest release...")
+                endif ()
 
-        # Include git utils
-        include("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/git_utils.cmake")
+                if (NOT ARGS_VERSION OR "${ARGS_VERSION}" STREQUAL "LATEST")
+                        get_latest_tag(
+                                GIT_REPOSITORY ${ARGS_GIT_REPOSITORY}
+                                LIBRARY_NAME ${ARGS_LIBRARY_NAME}
+                                CLEAR OFF
+                                OUTPUT_VARIABLE ARGS_VERSION
+                        )
+                endif ()
+        endif ()
 
-        # Get latest git tag.
-        get_latest_tag(
-                PROFILE_NAME ${ARGS_PROFILE_NAME}
-                REPOSITORY_NAME ${ARGS_REPOSITORY_NAME}
-                CLEAR FALSE
-                OUTPUT_VARIABLE TAG_NAME
-        )
+        if (ARGS_URL)
+                download_library(
+                        URL ${ARGS_URL}
+                        DIRECTORY ${ARGS_DIRECTORY}
+                        LIBRARY_NAME ${ARGS_LIBRARY_NAME}
+                )
+        else ()
+                # Save the version in the ARGS_BRANCH variable, as you can use
+                # the --branch option to pass tags.
+                if (NOT ARGS_BRANCH)
+                        set(ARGS_BRANCH ${ARGS_VERSION})
+                endif ()
 
-        # Fetch latest release
-        download_from_url(
-                URL "${GITHUB_URL}/archive/refs/tags/${TAG_NAME}.tar.gz"
-                DIRECTORY ${ARGS_DIRECTORY}
-                LIBRARY_NAME ${ARGS_REPOSITORY_NAME}
-        )
-endfunction()
+                set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
 
-# Downloads and builds a library from the latest release on github
-function(build_latest_release)
-        # Parse args
-        set(ONE_VALUE_ARGS TARGET PROFILE_NAME REPOSITORY_NAME DIRECTORY INSTALL_ENABLED)
-        set(MULTI_VALUE_ARGS BUILD_ARGS)
-        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
+                if (EXISTS ${LIBRARY_DIR})
+                        if (ARGS_KEEP_UPDATED)
+                                execute_process(
+                                        COMMAND git pull ${ARGS_GIT_REPOSITORY}
+                                        WORKING_DIRECTORY ${LIBRARY_DIR}
+                                )
+                        endif()
+                else ()
+                        execute_process(
+                                COMMAND git clone ${ARGS_GIT_REPOSITORY} --branch ${ARGS_BRANCH} --recurse-submodules -j 8 --depth 1 ${LIBRARY_DIR}
+                        )
+                endif ()
+        endif ()
 
-        # Validate parameters
+        if (ARGS_DOWNLOAD_ONLY)
+                return()
+        endif ()
+
         if (NOT ARGS_TARGET)
-                message(FATAL_ERROR "TARGET is a mandatory parameter of build_latest_release.")
-        endif ()
-        if (NOT ARGS_PROFILE_NAME)
-                message(FATAL_ERROR "PROFILE_NAME is a mandatory parameter of build_latest_release.")
-        endif ()
-        if (NOT ARGS_REPOSITORY_NAME)
-                message(FATAL_ERROR "REPOSITORY_NAME is a mandatory parameter of build_latest_release.")
-        endif ()
-        if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY is a mandatory parameter of build_latest_release.")
+                message(FATAL_ERROR "TARGET must be given when DOWNLOAD_ONLY is OFF.")
         endif ()
 
-        # Get github url from profile and repo name
-        set(GITHUB_URL "https://github.com/${ARGS_PROFILE_NAME}/${ARGS_REPOSITORY_NAME}")
-
-        # Include git utils
-        include("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/git_utils.cmake")
-
-        # Get latest git tag.
-        get_latest_tag(
-                PROFILE_NAME ${ARGS_PROFILE_NAME}
-                REPOSITORY_NAME ${ARGS_REPOSITORY_NAME}
-                CLEAR FALSE
-                OUTPUT_VARIABLE TAG_NAME
-        )
-
-        # Fetch latest release
-        build_from_url(
+        build_library(
                 TARGET ${ARGS_TARGET}
-                URL "${GITHUB_URL}/archive/refs/tags/${TAG_NAME}.tar.gz"
                 DIRECTORY ${ARGS_DIRECTORY}
-                LIBRARY_NAME ${ARGS_REPOSITORY_NAME}
+                LIBRARY_NAME ${ARGS_LIBRARY_NAME}
                 INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
                 BUILD_ARGS ${ARGS_BUILD_ARGS}
         )
+
 endfunction()
