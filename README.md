@@ -1,10 +1,14 @@
-# get_library
+# CMake GetProject
 
-Some utility functions for CMake. All functions use the `cmake_parse_arguments()` function.
-To call a function the parameter name must be specified.
+`get_project()` function, **downloads** and **configures** (*can be disabled*) an
+external project. The download is performed at **configuration** time. Does **not
+rely** on `FetchContent` or `ExternalProject`.
+
+The output will be placed in `${DIRECTORY}/${LIBRARY_NAME}`. `LIBRARY_NAME` will
+be obtained through the `GIT_REPOSITORY` if not provided.
 
 ```cmake
-get_library(
+get_project(
         TARGET                  # The target that depends on the library
         DOWNLOAD_ONLY           # If ON does blocks configuration
         DIRECTORY               # The directory the library will be placed in
@@ -21,11 +25,11 @@ get_library(
 
 ## Examples
 
-**Download** and **build** the library from a URL with the **install** step.
+**Downloads** the project from a **URL** and **builds** and **installs** it.
 The library will be placed in `${DIRECTORY}/${LIBRARY_NAME}`.
 
 ```cmake
-get_library(
+get_project(
         TARGET ${PROJECT_NAME}
         DIRECTORY "./libs"
         INSTALL_ENABLED ON
@@ -36,12 +40,11 @@ get_library(
 )
 ```
 
-**Download** the library from a **git repository** and a **branch** keeping
+**Downloads** the library from a **git repository** and a **branch** keeping
 the library **updated** but without performing the install step.
-The library will be placed in `${DIRECTORY}/<repo_name>`.
 
 ```cmake
-get_library(
+get_project(
         DOWNLOAD_ONLY ON
         DIRECTORY "./libs"
         GIT_REPOSITORY "https://github.com/torvalds/linux.git"
@@ -51,10 +54,9 @@ get_library(
 ```
 
 **Download** and **build** the library from a **git repository** and a **version**.
-The library will be placed in `${DIRECTORY}/<repo_name>`.
 
 ```cmake
-get_library(
+get_project(
         TARGET ${PROJECT_NAME}
         DIRECTORY "./libs"
         GIT_REPOSITORY "https://github.com/torvalds/linux.git"
@@ -63,10 +65,9 @@ get_library(
 ```
 
 **Download** and **build** the **latest** version of the library from a **git repository**.
-The library will be placed in `${DIRECTORY}/<repo_name>`.
 
 ```cmake
-get_library(
+get_project(
         TARGET ${PROJECT_NAME}
         DIRECTORY "./libs"
         GIT_REPOSITORY "https://github.com/torvalds/linux.git"
