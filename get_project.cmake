@@ -53,8 +53,8 @@ function(get_latest_tag)
                 execute_process(COMMAND ${GIT_FETCH_COMMAND}
                         WORKING_DIRECTORY ${CACHE_DIR})
         else ()
-                message(STATUS "Cached folder for repository '${ARGS_GIT_REPOSITORY}', "
-                        "executing only 'git pull'.")
+                message(STATUS "Cache folder for repository '${ARGS_GIT_REPOSITORY}' "
+                               "exists, executing only 'git pull'.")
 
                 set(GIT_PULL_COMMAND git pull)
 
@@ -115,7 +115,7 @@ function(download_file)
                 # Check if HASH_TYPE parameter was given
                 if (NOT ARGS_HASH_TYPE)
                         message(FATAL_ERROR "HASH_TYPE must be provided when passing HASH parameter "
-                                "to download_file_from_url.")
+                                            "to download_file_from_url.")
                 endif ()
 
                 # Download file with hash comparison
@@ -225,17 +225,17 @@ function(download_library)
 
                 if (LIBRARY_DIR_VALID)
                         message(STATUS "Old and new downloaded file hashes match, "
-                                "but '${ARGS_LIBRARY_NAME}' directory does not exist / is empty, "
-                                "extracting...")
+                                       "but '${ARGS_LIBRARY_NAME}' directory does "
+                                       "not exist / is empty, extracting...")
                 else ()
                         message(STATUS "Old and new downloaded file hashes match. "
-                                "Not Extracting.")
+                                       "Not Extracting.")
 
                         return()
                 endif ()
         else ()
                 message(STATUS "Old and new downloaded file hashes don't match, "
-                        "extracting...")
+                               "extracting...")
         endif ()
 
         # Write hash file only if its different
@@ -361,17 +361,17 @@ function (get_project)
 
         if (NOT ARGS_URL AND NOT ARGS_GIT_REPOSITORY)
                 message(FATAL_ERROR "Either URL or GIT_REPOSITORY is required for get_library "
-                        "to do something.")
+                                    "to do something.")
         endif ()
 
         if (NOT ARGS_BRANCH AND NOT "${ARGS_KEEP_UPDATED}" STREQUAL "")
                 message(WARNING "KEEP_UPDATED argument is only used when the BRANCH argument "
-                        "is passed.")
+                                "is passed.")
         endif ()
 
         if (ARGS_DOWNLOAD_ONLY AND ARGS_BUILD_ARGS)
                 message(WARNING "BUILD_ARGS argument is only used when the DOWNLOAD_ONLY "
-                        "argument is set to OFF.")
+                                "argument is set to OFF.")
         endif ()
 
         if (ARGS_GIT_REPOSITORY)
@@ -424,8 +424,8 @@ function (get_project)
                                 # If version does not match delete existing library
                                 # and the version file.
                                 message(STATUS "Downloaded library '${ARGS_LIBRARY_NAME}' version "
-                                        "'${DOWNLOADED_VERSION}' does not match requested "
-                                        "version '${ARGS_VERSION}', deleting existing one...")
+                                               "'${DOWNLOADED_VERSION}' does not match requested "
+                                               "version '${ARGS_VERSION}', deleting existing one...")
 
                                 file(REMOVE_RECURSE ${LIBRARY_DIR})
                                 file(REMOVE ${VERSION_FILE})
@@ -437,13 +437,13 @@ function (get_project)
                                 if (LIBRARY_DIR_VALID)
                                         # Don't do anything if versions match.
                                         message(STATUS "Previously downloaded library '${ARGS_LIBRARY_NAME}' version "
-                                                "'${DOWNLOADED_VERSION}' matches requested version "
-                                                "'${ARGS_VERSION}', not doing anything.")
+                                                       "'${DOWNLOADED_VERSION}' matches requested version "
+                                                       "'${ARGS_VERSION}', not doing anything.")
                                 else ()
                                         message(STATUS "Previously downloaded library '${ARGS_LIBRARY_NAME}' version "
-                                                "'${DOWNLOADED_VERSION}' matches requested version "
-                                                "'${ARGS_VERSION}', but directory is missing / empty, "
-                                                "cloning...")
+                                                       "'${DOWNLOADED_VERSION}' matches requested version "
+                                                       "'${ARGS_VERSION}', but directory is missing / empty, "
+                                                       "cloning...")
 
                                         if (EXISTS ${LIBRARY_DIR})
                                                 file(REMOVE_RECURSE ${LIBRARY_DIR})
