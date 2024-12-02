@@ -49,12 +49,14 @@ function(get_latest_tag)
                 # Clone repo with lowest depth possible and fetch tags, two
                 # commands are needed as cmake does not wait for the first command
                 # to finish execution before calling the second one
-                execute_process(COMMAND ${GIT_CLONE_COMMAND})
+                execute_process(COMMAND ${GIT_CLONE_COMMAND}
+                        OUTPUT_QUIET)
                 execute_process(COMMAND ${GIT_FETCH_COMMAND}
-                        WORKING_DIRECTORY ${CACHE_DIR})
+                        WORKING_DIRECTORY ${CACHE_DIR}
+                        OUTPUT_QUIET)
         else ()
                 message(STATUS "Cache folder for repository '${ARGS_GIT_REPOSITORY}' "
-                               "exists, executing only 'git pull'.")
+                        "exists, executing only 'git pull'.")
 
                 set(GIT_PULL_COMMAND git pull)
 
@@ -115,7 +117,7 @@ function(download_file)
                 # Check if HASH_TYPE parameter was given
                 if (NOT ARGS_HASH_TYPE)
                         message(FATAL_ERROR "HASH_TYPE must be provided when passing HASH parameter "
-                                            "to download_file_from_url.")
+                                "to download_file_from_url.")
                 endif ()
 
                 # Download file with hash comparison
@@ -188,6 +190,7 @@ function(download_library)
         set(TMP_DIR "${INTERNAL_LIBRARY_DIR}/.tmp")
         set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
         set(HASH_FILE "${INTERNAL_LIBRARY_DIR}/hash")
+        set(BUILD_DEPENDENCY_FILE "${INTERNAL_LIBRARY_DIR}/build")
 
         # Create get_library internal directory
         if (NOT EXISTS ${GET_LIBRARY_DIR})
@@ -225,18 +228,20 @@ function(download_library)
 
                 if (LIBRARY_DIR_VALID)
                         message(STATUS "Old and new downloaded file hashes match, "
-                                       "but '${ARGS_LIBRARY_NAME}' directory does "
-                                       "not exist / is empty, extracting...")
+                                "but '${ARGS_LIBRARY_NAME}' directory does "
+                                "not exist / is empty, extracting...")
                 else ()
                         message(STATUS "Old and new downloaded file hashes match. "
-                                       "Not Extracting.")
+                                "Not Extracting.")
 
                         return()
                 endif ()
         else ()
                 message(STATUS "Old and new downloaded file hashes don't match, "
-                               "extracting...")
+                        "extracting...")
         endif ()
+
+        execute_process(COMMAND ${CMAKE_COMMAND} -E touch ${BUILD_DEPENDENCY_FILE})
 
         # Write hash file only if its different
         file(WRITE ${HASH_FILE} ${NEW_HASH})
@@ -281,12 +286,12 @@ function (build_library)
         endif ()
 
         # Directories and files
-        set(GET_LIBRARY_DIR "${CMAKE_BINARY_DIR}/get_library")
+        set(GET_LIBRARY_DIR "${CMAKE_BINARY_DIR}/get_project")
         set(INTERNAL_LIBRARY_DIR "${GET_LIBRARY_DIR}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/build_library")
         set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
         set(BUILD_DIR "${LIBRARY_DIR}/build/${CMAKE_GENERATOR}-${CMAKE_BUILD_TYPE}")
-        set(HASH_FILE "${INTERNAL_LIBRARY_DIR}/hash")
+        set(BUILD_DEPENDENCY_FILE "${INTERNAL_LIBRARY_DIR}/build")
 
         # Configure options
         set(BUILD_ARGS
@@ -323,7 +328,7 @@ function (build_library)
                 COMMAND ${CMAKE_COMMAND} ${INSTALL_COMMAND}
                 COMMAND ${CMAKE_COMMAND} -E touch ${DEPENDENCY_FILE}
                 WORKING_DIRECTORY ${LIBRARY_DIR}
-                DEPENDS ${HASH_FILE})
+                DEPENDS ${BUILD_DEPENDENCY_FILE})
 
         # Add dependency to input target
         set(LIBRARY_TARGET "${ARGS_LIBRARY_NAME}_target")
@@ -352,7 +357,7 @@ function (get_project)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
         if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY is a required argument of get_library().")
+                message(FATAL_ERROR "DIRECTORY is a required argument of get_project().")
         endif ()
 
         if (ARGS_URL AND NOT ARGS_LIBRARY_NAME)
@@ -361,17 +366,21 @@ function (get_project)
 
         if (NOT ARGS_URL AND NOT ARGS_GIT_REPOSITORY)
                 message(FATAL_ERROR "Either URL or GIT_REPOSITORY is required for get_library "
-                                    "to do something.")
+                        "to do something.")
         endif ()
 
         if (NOT ARGS_BRANCH AND NOT "${ARGS_KEEP_UPDATED}" STREQUAL "")
                 message(WARNING "KEEP_UPDATED argument is only used when the BRANCH argument "
-                                "is passed.")
+                        "is passed.")
         endif ()
 
         if (ARGS_DOWNLOAD_ONLY AND ARGS_BUILD_ARGS)
                 message(WARNING "BUILD_ARGS argument is only used when the DOWNLOAD_ONLY "
-                                "argument is set to OFF.")
+                        "argument is set to OFF.")
+        endif ()
+
+        if (NOT ARGS_DOWNLOAD_ONLY AND NOT ARGS_TARGET)
+                message(FATAL_ERROR "TARGET is required when DOWNLOAD_ONLY is OFF.")
         endif ()
 
         if (ARGS_GIT_REPOSITORY)
@@ -415,6 +424,19 @@ function (get_project)
         set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
         set(INTERNAL_LIBRARY_DIR "${GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(VERSION_FILE "${INTERNAL_LIBRARY_DIR}/version")
+        set(BUILD_DEPENDENCY_FILE "${INTERNAL_LIBRARY_DIR}/build")
+
+        if (NOT ARGS_URL)
+                set(BOOL TOUCH_FILE ON)
+        else ()
+                # Managed by download_library()
+                set(BOOL TOUCH_FILE OFF)
+        endif ()
+
+        if (NOT EXISTS ${BUILD_DEPENDENCY_FILE} AND NOT ARGS_DOWNLOAD_ONLY)
+                # Will trigger dependency on creation.
+                file(WRITE ${BUILD_DEPENDENCY_FILE})
+        endif ()
 
         if (ARGS_VERSION AND NOT "${ARGS_VERSION}" STREQUAL "LATEST")
                 if (EXISTS ${INTERNAL_LIBRARY_DIR} AND EXISTS ${VERSION_FILE})
@@ -424,8 +446,8 @@ function (get_project)
                                 # If version does not match delete existing library
                                 # and the version file.
                                 message(STATUS "Downloaded library '${ARGS_LIBRARY_NAME}' version "
-                                               "'${DOWNLOADED_VERSION}' does not match requested "
-                                               "version '${ARGS_VERSION}', deleting existing one...")
+                                        "'${DOWNLOADED_VERSION}' does not match requested "
+                                        "version '${ARGS_VERSION}', deleting existing one...")
 
                                 file(REMOVE_RECURSE ${LIBRARY_DIR})
                                 file(REMOVE ${VERSION_FILE})
@@ -437,13 +459,15 @@ function (get_project)
                                 if (LIBRARY_DIR_VALID)
                                         # Don't do anything if versions match.
                                         message(STATUS "Previously downloaded library '${ARGS_LIBRARY_NAME}' version "
-                                                       "'${DOWNLOADED_VERSION}' matches requested version "
-                                                       "'${ARGS_VERSION}', not doing anything.")
+                                                "'${DOWNLOADED_VERSION}' matches requested version "
+                                                "'${ARGS_VERSION}', not doing anything.")
+
+                                        set(TOUCH_FILE OFF)
                                 else ()
                                         message(STATUS "Previously downloaded library '${ARGS_LIBRARY_NAME}' version "
-                                                       "'${DOWNLOADED_VERSION}' matches requested version "
-                                                       "'${ARGS_VERSION}', but directory is missing / empty, "
-                                                       "cloning...")
+                                                "'${DOWNLOADED_VERSION}' matches requested version "
+                                                "'${ARGS_VERSION}', but directory is missing / empty, "
+                                                "cloning...")
 
                                         if (EXISTS ${LIBRARY_DIR})
                                                 file(REMOVE_RECURSE ${LIBRARY_DIR})
@@ -499,8 +523,8 @@ function (get_project)
                 return()
         endif ()
 
-        if (NOT ARGS_TARGET)
-                message(FATAL_ERROR "TARGET must be given when DOWNLOAD_ONLY is OFF.")
+        if (TOUCH_FILE)
+                execute_process(COMMAND ${CMAKE_COMMAND} -E touch ${BUILD_DEPENDENCY_FILE})
         endif ()
 
         build_library(
