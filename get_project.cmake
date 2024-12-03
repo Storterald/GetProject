@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.5)
 
-set(GET_PROJECT_DIR "${CMAKE_BINARY_DIR}/get_project")
+if (NOT DEFINED INTERNAL_GET_PROJECT_DIR)
+        set(INTERNAL_GET_PROJECT_DIR "${CMAKE_BINARY_DIR}/get_project")
+endif ()
 
 # Create get_project internal directory if it does not exist
-if (NOT EXISTS ${GET_PROJECT_DIR})
-        file(MAKE_DIRECTORY ${GET_PROJECT_DIR})
+if (NOT EXISTS ${INTERNAL_GET_PROJECT_DIR})
+        file(MAKE_DIRECTORY ${INTERNAL_GET_PROJECT_DIR})
 endif ()
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -28,11 +30,11 @@ function(get_latest_tag)
         endif ()
 
         # Directories
-        set(INTERNAL_LIBRARY_DIR "${GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/get_latest_tag")
 
-        if (NOT EXISTS ${LIBRARY_DIR})
-                file(MAKE_DIRECTORY ${LIBRARY_DIR})
+        if (NOT EXISTS ${INTERNAL_LIBRARY_DIR})
+                file(MAKE_DIRECTORY ${INTERNAL_LIBRARY_DIR})
         endif ()
 
         if (NOT EXISTS ${CACHE_DIR})
@@ -185,7 +187,7 @@ function(download_library)
         endif ()
 
         # Directories and files
-        set(INTERNAL_LIBRARY_DIR "${GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/download_library")
         set(TMP_DIR "${INTERNAL_LIBRARY_DIR}/.tmp")
         set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
@@ -422,7 +424,7 @@ function (get_project)
 
         # Directories and files
         set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
-        set(INTERNAL_LIBRARY_DIR "${GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(VERSION_FILE "${INTERNAL_LIBRARY_DIR}/version")
         set(BUILD_DEPENDENCY_FILE "${INTERNAL_LIBRARY_DIR}/build")
 
