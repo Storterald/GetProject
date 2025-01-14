@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 
-set(GET_PROJECT_DIR "${CMAKE_BINARY_DIR}/get_project")
+set(GET_PROJECT_DIR "${CMAKE_BINARY_DIR}/GetProject")
 
-# Create get_project internal directory if it does not exist
+# Create GetProject internal directory if it does not exist
 if (NOT EXISTS ${GET_PROJECT_DIR})
         file(MAKE_DIRECTORY ${GET_PROJECT_DIR})
 endif ()
@@ -11,7 +11,31 @@ endif ()
 # HELPER FUNCTIONS
 # ----------------------------------------------------------------------------------------------------------------------
 
-function(get_latest_tag)
+function (_check_internet_connection)
+        set(ONE_VALUE_ARGS
+                OUTPUT_VARIABLE)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
+
+        if (WIN32)
+                set(PING_COMMAND ping 8.8.8.8 -n 2)
+        else ()
+                set(PING_COMMAND ping 8.8.8.8 -c 2)
+        endif ()
+
+        execute_process(
+                COMMAND ${PING_COMMAND}
+                OUTPUT_QUIET
+                ERROR_QUIET
+                RESULT_VARIABLE IS_CONNECTED)
+
+        if (NOT IS_CONNECTED EQUAL 0)
+                set(BOOL ARGS_OUTPUT_VARIABLE ON PARENT_SCOPE)
+        else ()
+                set(BOOL ARGS_OUTPUT_VARIABLE OFF PARENT_SCOPE)
+        endif ()
+endfunction ()
+
+function (_get_latest_tag)
         set(ONE_VALUE_ARGS
                 GIT_REPOSITORY
                 LIBRARY_NAME
@@ -19,17 +43,29 @@ function(get_latest_tag)
                 OUTPUT_VARIABLE)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_GIT_REPOSITORY)
-                message(FATAL_ERROR "GIT_REPOSITORY is a required argument of get_latest_tag().")
-        endif ()
-
-        if (NOT ARGS_LIBRARY_NAME)
-                message(FATAL_ERROR "LIBRARY_NAME is a required argument of get_latest_tag().")
+        if (NOT ARGS_GIT_REPOSITORY OR NOT ARGS_LIBRARY_NAME)
+                message(FATAL_ERROR
+                        "Missing parameters in function call to "
+                        "_get_latest_tag, please report this at the url "
+                        "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Directories
         set(INTERNAL_LIBRARY_DIR "${GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/get_latest_tag")
+
+        # Commands
+        set(GIT_CLONE_COMMAND git clone ${ARGS_GIT_REPOSITORY}
+                --depth 1
+                --no-checkout
+                --quiet
+                ${CACHE_DIR})
+        set(GIT_FETCH_COMMAND git fetch
+                --tags
+                --depth 1
+                --quiet)
+        set(GIT_PULL_COMMAND git pull
+                --quiet)
 
         if (NOT EXISTS ${LIBRARY_DIR})
                 file(MAKE_DIRECTORY ${LIBRARY_DIR})
@@ -38,30 +74,21 @@ function(get_latest_tag)
         if (NOT EXISTS ${CACHE_DIR})
                 file(MAKE_DIRECTORY ${CACHE_DIR})
 
-                set(GIT_CLONE_COMMAND git clone ${ARGS_GIT_REPOSITORY}
-                        --depth 1
-                        --no-checkout
-                        ${CACHE_DIR})
-                set(GIT_FETCH_COMMAND git fetch
-                        --tags
-                        --depth 1)
-
                 # Clone repo with lowest depth possible and fetch tags, two
                 # commands are needed as cmake does not wait for the first command
                 # to finish execution before calling the second one
                 execute_process(COMMAND ${GIT_CLONE_COMMAND}
-                        OUTPUT_QUIET)
+                        OUTPUT_QUIET
+                        ERROR_QUIET)
                 execute_process(COMMAND ${GIT_FETCH_COMMAND}
                         WORKING_DIRECTORY ${CACHE_DIR}
-                        OUTPUT_QUIET)
+                        OUTPUT_QUIET
+                        ERROR_QUIET)
         else ()
-                message(STATUS "Cache folder for repository '${ARGS_GIT_REPOSITORY}' "
-                        "exists, executing only 'git pull'.")
-
-                set(GIT_PULL_COMMAND git pull)
-
                 execute_process(COMMAND ${GIT_PULL_COMMAND}
-                        WORKING_DIRECTORY ${CACHE_DIR})
+                        WORKING_DIRECTORY ${CACHE_DIR}
+                        OUTPUT_QUIET
+                        ERROR_QUIET)
         endif ()
 
         # Sort tags by creation date
@@ -85,13 +112,10 @@ function(get_latest_tag)
         string(REGEX MATCH "([^ \n]+)" TAG_NAME ${TAG_LIST})
         set(TAG_NAME "${CMAKE_MATCH_1}")
 
-        message(STATUS "Latest tag for repository '${ARGS_GIT_REPOSITORY}' "
-                "has been found to be '${TAG_NAME}'")
-
         set(${ARGS_OUTPUT_VARIABLE} ${TAG_NAME} PARENT_SCOPE)
-endfunction()
+endfunction ()
 
-function(download_file)
+function (_download_file)
         set(ONE_VALUE_ARGS
                 URL
                 DIRECTORY
@@ -99,12 +123,11 @@ function(download_file)
                 HASH_TYPE)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_URL)
-                message(FATAL_ERROR "URL is a required argument of download_file().")
-        endif ()
-
-        if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY is a required argument of download_file().")
+        if (NOT ARGS_URL OR NOT ARGS_DIRECTORY)
+                message(FATAL_ERROR
+                        "Missing parameters in function call to "
+                        "_download_file, please report this at the url "
+                        "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Get archive name and extension
@@ -137,20 +160,19 @@ function(download_file)
         else ()
                 message(STATUS "Correctly downloaded file '${FILE_NAME}${FILE_EXT}'.")
         endif()
-endfunction()
+endfunction ()
 
-function (is_library_directory_valid)
+function (_is_library_directory_valid)
         set(ONE_VALUE_ARGS
                 LIBRARY_DIR
                 OUTPUT_VARIABLE)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_LIBRARY_DIR)
-                message(FATAL_ERROR "LIBRARY_DIR must be given to is_library_directory_valid().")
-        endif ()
-
-        if (NOT ARGS_OUTPUT_VARIABLE)
-                message(FATAL_ERROR "OUTPUT_VARIABLE must be given to is_library_directory_valid().")
+        if (NOT ARGS_LIBRARY_DIR OR NOT ARGS_OUTPUT_VARIABLE)
+                message(FATAL_ERROR
+                        "Missing parameters in function call to "
+                        "_is_library_directory_valid, please report this at the url "
+                        "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Used to check if directory is empty
@@ -165,23 +187,18 @@ function (is_library_directory_valid)
         endif ()
 endfunction ()
 
-function(download_library)
+function (_download_library_url)
         set(ONE_VALUE_ARGS
                 URL
                 DIRECTORY
                 LIBRARY_NAME)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_URL)
-                message(FATAL_ERROR "URL is a required argument of download_library().")
-        endif ()
-
-        if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY is a required argument of download_library().")
-        endif ()
-
-        if (NOT ARGS_LIBRARY_NAME)
-                message(FATAL_ERROR "LIBRARY_NAME is a required argument of download_library().")
+        if (NOT ARGS_URL OR NOT ARGS_DIRECTORY OR NOT ARGS_LIBRARY_NAME)
+                message(FATAL_ERROR
+                        "Missing parameters in function call to "
+                        "_download_library_url, please report this at the url "
+                        "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Directories and files
@@ -210,7 +227,7 @@ function(download_library)
         endif ()
 
         # Download library archive
-        download_file(
+        _download_file(
                 URL ${ARGS_URL}
                 DIRECTORY ${CACHE_DIR}
                 HASH ${HASH}
@@ -261,9 +278,61 @@ function(download_library)
 
         # Clean up the temporary directory
         file(REMOVE_RECURSE ${TMP_DIR})
-endfunction()
+endfunction ()
 
-function (build_library)
+function (_download_library_git)
+        set(ONE_VALUE_ARGS
+                GIT_REPOSITORY
+                LIBRARY_DIR
+                VERSION
+                BRANCH
+                KEEP_UPDATED)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
+
+        if (NOT ARGS_GIT_REPOSITORY OR (NOT ARGS_BRANCH AND NOT ARGS_VERSION) OR NOT ARGS_LIBRARY_DIR)
+                message(FATAL_ERROR
+                        "Missing parameters in function call to "
+                        "_download_library_git, please report this at the url "
+                        "https://github.com/Storterald/GetProject/issues.")
+        endif ()
+
+        # Save the version or the branch in the COMMAND_BRANCH variable,
+        # as you can use the --branch option to pass tags.
+        if (NOT ARGS_BRANCH)
+                set(COMMAND_BRANCH ${ARGS_VERSION})
+        else ()
+                set(COMMAND_BRANCH ${ARGS_BRANCH})
+        endif ()
+
+        # Commands
+        set(GIT_CLONE_COMMAND ${GIT_EXECUTABLE} clone ${ARGS_GIT_REPOSITORY}
+                --branch ${COMMAND_BRANCH}
+                --recurse-submodules
+                -j 8
+                --depth 1
+                -c advice.detachedHead=false
+                --quiet
+                ${ARGS_LIBRARY_DIR})
+        set(GIT_PULL_COMMAND ${GIT_EXECUTABLE} pull ${ARGS_GIT_REPOSITORY}
+                --quiet)
+
+        if (EXISTS ${ARGS_LIBRARY_DIR})
+                if (ARGS_BRANCH AND ARGS_KEEP_UPDATED)
+                        execute_process(
+                                COMMAND ${GIT_PULL_COMMAND}
+                                WORKING_DIRECTORY ${ARGS_LIBRARY_DIR}
+                                OUTPUT_QUIET
+                                ERROR_QUIET)
+                endif()
+        else ()
+                execute_process(
+                        COMMAND ${GIT_CLONE_COMMAND}
+                        OUTPUT_QUIET
+                        ERROR_QUIET)
+        endif ()
+endfunction ()
+
+function (_build_library)
         set(ONE_VALUE_ARGS
                 TARGET
                 DIRECTORY
@@ -273,21 +342,15 @@ function (build_library)
                 BUILD_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        if (NOT ARGS_TARGET)
-                message(FATAL_ERROR "TARGET must be given to build_library().")
-        endif ()
-
-        if (NOT ARGS_DIRECTORY)
-                message(FATAL_ERROR "DIRECTORY must be given to build_library().")
-        endif ()
-
-        if (NOT ARGS_LIBRARY_NAME)
-                message(FATAL_ERROR "LIBRARY_NAME must be given to build_library().")
+        if (NOT ARGS_TARGET OR NOT ARGS_DIRECTORY OR NOT ARGS_LIBRARY_NAME)
+                message(FATAL_ERROR
+                        "Missing parameters in function call to "
+                        "_build_library, please report this at the url "
+                        "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Directories and files
-        set(GET_LIBRARY_DIR "${CMAKE_BINARY_DIR}/get_project")
-        set(INTERNAL_LIBRARY_DIR "${GET_LIBRARY_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "${GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/build_library")
         set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
         set(BUILD_DIR "${LIBRARY_DIR}/build/${CMAKE_GENERATOR}-${CMAKE_BUILD_TYPE}")
@@ -356,6 +419,16 @@ function (get_project)
                 BUILD_ARGS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
+        if (NOT ARGS_URL)
+                find_package(Git)
+                if (NOT GIT_FOUND)
+                        message(FATAL_ERROR
+                                "Git is required to use GetProject without the URL "
+                                "parameter. You can download git at "
+                                "https://git-scm.com/downloads")
+                endif ()
+        endif ()
+
         if (NOT ARGS_DIRECTORY)
                 message(FATAL_ERROR "DIRECTORY is a required argument of get_project().")
         endif ()
@@ -383,40 +456,31 @@ function (get_project)
                 message(FATAL_ERROR "TARGET is required when DOWNLOAD_ONLY is OFF.")
         endif ()
 
-        if (ARGS_GIT_REPOSITORY)
-                # Validate git repository without cloning
-                execute_process(
-                        COMMAND git ls-remote ${ARGS_GIT_REPOSITORY}
-                        RESULT_VARIABLE GIT_CHECK_RESULT
-                        OUTPUT_QUIET
-                        ERROR_QUIET)
+        # Check for internet connection
+        _check_internet_connection(
+                OUTPUT_VARIABLE IS_CONNECTED)
 
-                if(NOT GIT_CHECK_RESULT EQUAL 0)
-                        message(FATAL_ERROR "Invalid or inaccessible git repository '${ARGS_GIT_REPOSITORY}'.")
-                endif()
+        # If the library is downloaded via git, validate the repo and get the name.
+        if (ARGS_GIT_REPOSITORY)
+                # If connected to the internet validate the git repository
+                # without cloning
+                if (IS_CONNECTED)
+                        execute_process(
+                                COMMAND git ls-remote ${ARGS_GIT_REPOSITORY}
+                                RESULT_VARIABLE GIT_CHECK_RESULT
+                                OUTPUT_QUIET
+                                ERROR_QUIET)
+
+                        if(NOT GIT_CHECK_RESULT EQUAL 0)
+                                message(FATAL_ERROR
+                                        "Invalid or inaccessible git repository '${ARGS_GIT_REPOSITORY}'.")
+                        endif()
+                endif ()
 
                 # Extract the library name from the GIT_REPOSITORY parameter and
                 # save it in ARGS_LIBRARY_NAME if the user didn't provide one.
                 if (NOT ARGS_LIBRARY_NAME)
                         string(REGEX REPLACE ".*/([^/]+)\\.git$" "\\1" ARGS_LIBRARY_NAME ${ARGS_GIT_REPOSITORY})
-                endif ()
-        endif ()
-
-        # If using the LATEST VERSION option, or if not using BRANCH and VERSION
-        # is not specified, put the latest tag in ARGS_VERSION.
-        if (NOT ARGS_URL AND NOT ARGS_BRANCH)
-                if (ARGS_VERSION)
-                        string(TOUPPER "${ARGS_VERSION}" ARGS_VERSION)
-                else ()
-                        message(WARNING "VERSION argument is missing, downloading latest release...")
-                endif ()
-
-                if (NOT ARGS_VERSION OR "${ARGS_VERSION}" STREQUAL "LATEST")
-                        get_latest_tag(
-                                GIT_REPOSITORY ${ARGS_GIT_REPOSITORY}
-                                LIBRARY_NAME ${ARGS_LIBRARY_NAME}
-                                CLEAR OFF
-                                OUTPUT_VARIABLE ARGS_VERSION)
                 endif ()
         endif ()
 
@@ -426,11 +490,28 @@ function (get_project)
         set(VERSION_FILE "${INTERNAL_LIBRARY_DIR}/version")
         set(BUILD_DEPENDENCY_FILE "${INTERNAL_LIBRARY_DIR}/build")
 
+        if (NOT IS_CONNECTED)
+                message(STATUS
+                        "GetProject: Adding '${ARGS_LIBRARY_NAME}'. Since no "
+                        "internet connection has been found, nothing can be "
+                        "downloaded.")
+
+                if (EXISTS ${LIBRARY_DIR} AND NOT ARGS_DOWNLOAD_ONLY)
+                        _build_library(
+                                TARGET ${ARGS_TARGET}
+                                DIRECTORY ${ARGS_DIRECTORY}
+                                LIBRARY_NAME ${ARGS_LIBRARY_NAME}
+                                INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
+                                BUILD_ARGS ${ARGS_BUILD_ARGS})
+                endif ()
+                return ()
+        endif ()
+
+        message(STATUS
+                "GetProject: Adding '${ARGS_LIBRARY_NAME}'.")
+
         if (NOT ARGS_URL)
                 set(BOOL TOUCH_FILE ON)
-        else ()
-                # Managed by download_library()
-                set(BOOL TOUCH_FILE OFF)
         endif ()
 
         if (NOT EXISTS ${BUILD_DEPENDENCY_FILE} AND NOT ARGS_DOWNLOAD_ONLY)
@@ -438,37 +519,40 @@ function (get_project)
                 file(WRITE ${BUILD_DEPENDENCY_FILE})
         endif ()
 
-        if (ARGS_VERSION AND NOT "${ARGS_VERSION}" STREQUAL "LATEST")
+        if (NOT ARGS_URL AND NOT ARGS_BRANCH)
+                # Emit a warning if the version parameter is missing
+                if (NOT ARGS_VERSION)
+                        message(WARNING
+                                "VERSION argument is missing, downloading latest release...")
+                endif ()
+
+                # Check if the given version is set as null or latest, if so
+                # fetch the latest release.
+                string(TOUPPER "${ARGS_VERSION}" CAPS_VERSION)
+                if (NOT ARGS_VERSION OR "${CAPS_VERSION}" STREQUAL "LATEST")
+                        _get_latest_tag(
+                                GIT_REPOSITORY ${ARGS_GIT_REPOSITORY}
+                                LIBRARY_NAME ${ARGS_LIBRARY_NAME}
+                                CLEAR OFF
+                                OUTPUT_VARIABLE ARGS_VERSION)
+                endif ()
+
                 if (EXISTS ${INTERNAL_LIBRARY_DIR} AND EXISTS ${VERSION_FILE})
                         file(READ ${VERSION_FILE} DOWNLOADED_VERSION)
 
                         if (NOT "${DOWNLOADED_VERSION}" STREQUAL "${ARGS_VERSION}")
                                 # If version does not match delete existing library
                                 # and the version file.
-                                message(STATUS "Downloaded library '${ARGS_LIBRARY_NAME}' version "
-                                        "'${DOWNLOADED_VERSION}' does not match requested "
-                                        "version '${ARGS_VERSION}', deleting existing one...")
-
                                 file(REMOVE_RECURSE ${LIBRARY_DIR})
                                 file(REMOVE ${VERSION_FILE})
                         else ()
-                                is_library_directory_valid(
+                                _is_library_directory_valid(
                                         LIBRARY_DIR ${LIBRARY_DIR}
                                         OUTPUT_VARIABLE LIBRARY_DIR_VALID)
 
                                 if (LIBRARY_DIR_VALID)
-                                        # Don't do anything if versions match.
-                                        message(STATUS "Previously downloaded library '${ARGS_LIBRARY_NAME}' version "
-                                                "'${DOWNLOADED_VERSION}' matches requested version "
-                                                "'${ARGS_VERSION}', not doing anything.")
-
                                         set(TOUCH_FILE OFF)
                                 else ()
-                                        message(STATUS "Previously downloaded library '${ARGS_LIBRARY_NAME}' version "
-                                                "'${DOWNLOADED_VERSION}' matches requested version "
-                                                "'${ARGS_VERSION}', but directory is missing / empty, "
-                                                "cloning...")
-
                                         if (EXISTS ${LIBRARY_DIR})
                                                 file(REMOVE_RECURSE ${LIBRARY_DIR})
                                         endif ()
@@ -483,40 +567,17 @@ function (get_project)
         endif ()
 
         if (ARGS_URL)
-                download_library(
+                _download_library_url(
                         URL ${ARGS_URL}
                         DIRECTORY ${ARGS_DIRECTORY}
                         LIBRARY_NAME ${ARGS_LIBRARY_NAME})
         else ()
-                # Save the version or the branch in the COMMAND_BRANCH variable,
-                # as you can use the --branch option to pass tags.
-                if (NOT ARGS_BRANCH)
-                        set(COMMAND_BRANCH ${ARGS_VERSION})
-                else ()
-                        set(COMMAND_BRANCH ${ARGS_BRANCH})
-                endif ()
-
-                # Constants
-                set(GIT_PULL_COMMAND git pull ${ARGS_GIT_REPOSITORY})
-                set(GIT_CLONE_COMMAND git clone ${ARGS_GIT_REPOSITORY}
-                        --branch ${COMMAND_BRANCH}
-                        --recurse-submodules
-                        -j 8
-                        --depth 1
-                        -c advice.detachedHead=false
-                        ${LIBRARY_DIR})
-
-                if (EXISTS ${LIBRARY_DIR})
-                        if (ARGS_BRANCH AND ARGS_KEEP_UPDATED)
-                                execute_process(
-                                        COMMAND ${GIT_PULL_COMMAND}
-                                        WORKING_DIRECTORY ${LIBRARY_DIR})
-                        endif()
-                else ()
-                        execute_process(
-                                COMMAND ${GIT_CLONE_COMMAND}
-                                OUTPUT_QUIET)
-                endif ()
+                _download_library_git(
+                        GIT_REPOSITORY ${ARGS_GIT_REPOSITORY}
+                        LIBRARY_DIR ${LIBRARY_DIR}
+                        VERSION ${ARGS_VERSION}
+                        BRANCH ${ARGS_BRANCH}
+                        KEEP_UPDATED ${ARGS_KEEP_UPDATED})
         endif ()
 
         if (ARGS_DOWNLOAD_ONLY)
@@ -527,10 +588,10 @@ function (get_project)
                 execute_process(COMMAND ${CMAKE_COMMAND} -E touch ${BUILD_DEPENDENCY_FILE})
         endif ()
 
-        build_library(
+        _build_library(
                 TARGET ${ARGS_TARGET}
                 DIRECTORY ${ARGS_DIRECTORY}
                 LIBRARY_NAME ${ARGS_LIBRARY_NAME}
                 INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
                 BUILD_ARGS ${ARGS_BUILD_ARGS})
-endfunction()
+endfunction ()
