@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 3.5)
 
-set(GET_PROJECT_DIR "${CMAKE_BINARY_DIR}/GetProject")
+# Let the user define their own GetProject internal directory
+if (NOT DEFINED INTERNAL_GET_PROJECT_DIR)
+        set(INTERNAL_GET_PROJECT_DIR "${CMAKE_BINARY_DIR}/GetProject")
+endif ()
 
 # Create GetProject internal directory if it does not exist
-if (NOT EXISTS ${GET_PROJECT_DIR})
-        file(MAKE_DIRECTORY ${GET_PROJECT_DIR})
+if (NOT EXISTS ${INTERNAL_GET_PROJECT_DIR})
+        file(MAKE_DIRECTORY ${INTERNAL_GET_PROJECT_DIR})
 endif ()
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -51,7 +54,7 @@ function (_get_latest_tag)
         endif ()
 
         # Directories
-        set(INTERNAL_LIBRARY_DIR "${GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/get_latest_tag")
 
         # Commands
@@ -202,7 +205,7 @@ function (_download_library_url)
         endif ()
 
         # Directories and files
-        set(INTERNAL_LIBRARY_DIR "${GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/download_library")
         set(TMP_DIR "${INTERNAL_LIBRARY_DIR}/.tmp")
         set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
@@ -350,7 +353,7 @@ function (_build_library)
         endif ()
 
         # Directories and files
-        set(INTERNAL_LIBRARY_DIR "${GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/build_library")
         set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
         set(BUILD_DIR "${LIBRARY_DIR}/build/${CMAKE_GENERATOR}-${CMAKE_BUILD_TYPE}")
@@ -486,7 +489,7 @@ function (get_project)
 
         # Directories and files
         set(LIBRARY_DIR "${ARGS_DIRECTORY}/${ARGS_LIBRARY_NAME}")
-        set(INTERNAL_LIBRARY_DIR "${GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(VERSION_FILE "${INTERNAL_LIBRARY_DIR}/version")
         set(BUILD_DEPENDENCY_FILE "${INTERNAL_LIBRARY_DIR}/build")
 
