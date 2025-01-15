@@ -29,12 +29,12 @@ function (_check_internet_connection)
                 COMMAND ${PING_COMMAND}
                 OUTPUT_QUIET
                 ERROR_QUIET
-                RESULT_VARIABLE IS_CONNECTED)
+                RESULT_VARIABLE DISCONNECTED)
 
-        if (NOT IS_CONNECTED EQUAL 0)
-                set(BOOL ARGS_OUTPUT_VARIABLE ON PARENT_SCOPE)
+        if (NOT DISCONNECTED GREATER 0)
+                set(${ARGS_OUTPUT_VARIABLE} ON PARENT_SCOPE)
         else ()
-                set(BOOL ARGS_OUTPUT_VARIABLE OFF PARENT_SCOPE)
+                set(${ARGS_OUTPUT_VARIABLE} OFF PARENT_SCOPE)
         endif ()
 endfunction ()
 
