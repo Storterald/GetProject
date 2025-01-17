@@ -212,11 +212,6 @@ function (_download_library_url)
         set(HASH_FILE "${INTERNAL_LIBRARY_DIR}/hash")
         set(BUILD_DEPENDENCY_FILE "${INTERNAL_LIBRARY_DIR}/build")
 
-        # Create get_library internal directory
-        if (NOT EXISTS ${GET_LIBRARY_DIR})
-                file(MAKE_DIRECTORY ${GET_LIBRARY_DIR})
-        endif ()
-
         # Create library internal directory
         if (NOT EXISTS ${INTERNAL_LIBRARY_DIR})
                 file(MAKE_DIRECTORY ${INTERNAL_LIBRARY_DIR})
@@ -242,7 +237,7 @@ function (_download_library_url)
 
         # Don't waste time extracting stuff again if hashes match
         if (HASH AND "${NEW_HASH}" STREQUAL "${HASH}")
-                is_library_directory_valid(
+                _is_library_directory_valid(
                         LIBRARY_DIR ${LIBRARY_DIR}
                         OUTPUT_VARIABLE LIBRARY_DIR_VALID)
 
