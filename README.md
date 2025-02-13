@@ -1,3 +1,16 @@
+# DO NOT USE
+
+This code is still in `BETA` and will **likely not work** when used. This is just a
+side project I'm pursuing thanks to the deep hate I feel against `FetchContent`
+and `ExternalProject`.
+
+### Known Issues
+
+ - Requires the libraries to have been built **before** if they need to be added with
+   `target_link_libraries` as the libraries are created at **build time**.<br>
+   **Solution**: use `add_subdirectory()`, the **problem** is now performing the
+   `install` step.
+
 # CMake GetProject
 
 `get_project()` function, **downloads** and **configures** (*can be disabled*) an
