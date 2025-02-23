@@ -1,3 +1,6 @@
 # IDEs directories
 .idea/
 .vscode/
+
+# Test related directories
+tests
