@@ -619,6 +619,7 @@ function (get_project)
         endif ()
 
         set(${ARGS_LIBRARY_NAME}_DOWNLOADED ON PARENT_SCOPE)
+        set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
 
         if (ARGS_DOWNLOAD_ONLY)
                 return()
@@ -631,6 +632,5 @@ function (get_project)
                 OPTIONS ${ARGS_OPTIONS})
 
         set(${ARGS_LIBRARY_NAME}_ADDED ON PARENT_SCOPE)
-        set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
         set(${ARGS_LIBRARY_NAME}_BINARY ${${ARGS_LIBRARY_NAME}_BINARY} PARENT_SCOPE)
 endfunction ()
