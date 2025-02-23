@@ -361,14 +361,14 @@ endfunction ()
 
 function (_add_subdirectory)
         set(ONE_VALUE_ARGS
+                TARGET
                 LIBRARY_NAME
                 INSTALL_ENABLED)
         set(MULTI_VALUE_ARGS
-                TARGETS
                 OPTIONS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        if (NOT ARGS_TARGETS OR NOT ARGS_LIBRARY_NAME)
+        if (NOT ARGS_TARGET OR NOT ARGS_LIBRARY_NAME)
                 message(FATAL_ERROR
                         "Missing parameters in function call to "
                         "_add_subdirectory, please report this at the url "
@@ -384,8 +384,8 @@ function (_add_subdirectory)
         # be handled by the user.
         if (NOT EXISTS "${LIBRARY_DIR}/CMakeLists.txt")
                 message(WARNING "CMakeLists.txt file not found in library "
-                                "'${ARGS_LIBRARY_NAME}'. Not adding as a "
-                                "subdirectory.")
+                        "'${ARGS_LIBRARY_NAME}'. Not adding as a "
+                        "subdirectory.")
                 return ()
         endif ()
 
@@ -398,15 +398,18 @@ function (_add_subdirectory)
         foreach (OPTION IN LISTS ARGS_OPTIONS)
                 if (NOT ${OPTION} MATCHES ${REGEXP})
                         message(FATAL_ERROR "Option '${OPTION}' not recognized. "
-                                            "Use the format NAME=VALUE")
+                                "Use the format NAME=VALUE")
                 endif ()
 
                 string(REGEX MATCH ${REGEXP} OUT ${OPTION})
                 set(${CMAKE_MATCH_1} ${CMAKE_MATCH_2})
         endforeach ()
 
-        add_subdirectory(${LIBRARY_DIR} ${BUILD_DIR})
-
+        if (EXISTS "${LIBRARY_DIR}")
+                add_subdirectory(${LIBRARY_DIR} ${BUILD_DIR})
+        else ()
+                target_include_directories(${ARGS_TARGET} ${LIBRARY_DIR})
+        endif ()
         # To install a directory it's required that the library is built.
         # TODO find something better
         if (ARGS_INSTALL_ENABLED)
@@ -465,7 +468,6 @@ function (get_project)
                 KEEP_UPDATED
                 VERSION)
         set(MULTI_VALUE_ARGS
-                TARGETS
                 OPTIONS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
@@ -477,11 +479,6 @@ function (get_project)
                                 "URL parameter. You can download git at "
                                 "https://git-scm.com/downloads")
                 endif ()
-        endif ()
-
-        if (ARGS_TARGET AND ARGS_TARGETS)
-                message(FATAL_ERROR "Only one argument between ARGS_TARGET and "
-                        "ARGS_TARGETS can be used.")
         endif ()
 
         if (ARGS_URL AND NOT ARGS_LIBRARY_NAME)
@@ -503,9 +500,8 @@ function (get_project)
                         "argument is set to OFF.")
         endif ()
 
-        if (NOT ARGS_DOWNLOAD_ONLY AND NOT ARGS_TARGET AND NOT ARGS_TARGETS)
-                message(FATAL_ERROR "TARGET or TARGETS is required when DOWNLOAD_ONLY "
-                        "is OFF.")
+        if (NOT ARGS_DOWNLOAD_ONLY AND NOT ARGS_TARGET)
+                message(FATAL_ERROR "TARGET is required when DOWNLOAD_ONLY is OFF.")
         endif ()
 
         if (NOT ARGS_URL AND NOT ARGS_BRANCH AND NOT ARGS_VERSION)
@@ -546,13 +542,14 @@ function (get_project)
 
                 if (EXISTS ${LIBRARY_DIR} AND NOT ARGS_DOWNLOAD_ONLY)
                         _add_subdirectory(
-                                TARGETS ${ARGS_TARGET} ${ARGS_TARGETS}
+                                TARGET ${ARGS_TARGET}
                                 LIBRARY_NAME ${ARGS_LIBRARY_NAME}
                                 INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
                                 OPTIONS ${ARGS_OPTIONS})
-                        
+
                         set(${ARGS_LIBRARY_NAME}_DOWNLOADED ON PARENT_SCOPE)
                         set(${ARGS_LIBRARY_NAME}_ADDED ON PARENT_SCOPE)
+                        set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
                         set(${ARGS_LIBRARY_NAME}_BINARY ${${ARGS_LIBRARY_NAME}_BINARY} PARENT_SCOPE)
                 endif ()
 
@@ -626,7 +623,7 @@ function (get_project)
         endif ()
 
         _add_subdirectory(
-                TARGETS ${ARGS_TARGET} ${ARGS_TARGETS}
+                TARGET ${ARGS_TARGET}
                 LIBRARY_NAME ${ARGS_LIBRARY_NAME}
                 INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
                 OPTIONS ${ARGS_OPTIONS})
