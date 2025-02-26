@@ -375,10 +375,13 @@ function (_add_subdirectory)
                         "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
+        # Get the user defined output directory name
+        get_filename_component(BUILD_DIR_NAME "${CMAKE_BINARY_DIR}" NAME)
+
         # Directories
         set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(LIBRARY_DIR "${GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
-        set(BUILD_DIR "${LIBRARY_DIR}/build/${CMAKE_GENERATOR}-${CMAKE_BUILD_TYPE}")
+        set(BUILD_DIR "${LIBRARY_DIR}/build/${BUILD_DIR_NAME}")
 
         # If the library does not have CMake support. The inclusion must
         # be handled by the user.
@@ -391,7 +394,6 @@ function (_add_subdirectory)
 
         # Define variables for external use.
         set(${ARGS_LIBRARY_NAME}_ADDED ON PARENT_SCOPE)
-        set(${ARGS_LIBRARY_NAME}_BINARY ${BUILD_DIR} PARENT_SCOPE)
 
         # Define options
         set (REGEXP "^(.+)=(.+)$")
@@ -406,10 +408,11 @@ function (_add_subdirectory)
         endforeach ()
 
         if (EXISTS "${LIBRARY_DIR}")
-                add_subdirectory(${LIBRARY_DIR} ${BUILD_DIR})
+                add_subdirectory(${LIBRARY_DIR})
         else ()
                 target_include_directories(${ARGS_TARGET} ${LIBRARY_DIR})
         endif ()
+
         # To install a directory it's required that the library is built.
         # TODO find something better
         if (ARGS_INSTALL_ENABLED)
@@ -629,5 +632,4 @@ function (get_project)
                 OPTIONS ${ARGS_OPTIONS})
 
         set(${ARGS_LIBRARY_NAME}_ADDED ON PARENT_SCOPE)
-        set(${ARGS_LIBRARY_NAME}_BINARY ${${ARGS_LIBRARY_NAME}_BINARY} PARENT_SCOPE)
 endfunction ()
