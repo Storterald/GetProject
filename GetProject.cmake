@@ -361,14 +361,13 @@ endfunction ()
 
 function (_add_subdirectory)
         set(ONE_VALUE_ARGS
-                TARGET
                 LIBRARY_NAME
                 INSTALL_ENABLED)
         set(MULTI_VALUE_ARGS
                 OPTIONS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        if (NOT ARGS_TARGET OR NOT ARGS_LIBRARY_NAME)
+        if (NOT ARGS_LIBRARY_NAME)
                 message(FATAL_ERROR
                         "Missing parameters in function call to "
                         "_add_subdirectory, please report this at the url "
@@ -407,11 +406,7 @@ function (_add_subdirectory)
                 set(${CMAKE_MATCH_1} ${CMAKE_MATCH_2})
         endforeach ()
 
-        if (EXISTS "${LIBRARY_DIR}")
-                add_subdirectory(${LIBRARY_DIR})
-        else ()
-                target_include_directories(${ARGS_TARGET} ${LIBRARY_DIR})
-        endif ()
+        add_subdirectory(${LIBRARY_DIR})
 
         # To install a directory it's required that the library is built.
         # TODO find something better
@@ -626,7 +621,6 @@ function (get_project)
         endif ()
 
         _add_subdirectory(
-                TARGET ${ARGS_TARGET}
                 LIBRARY_NAME ${ARGS_LIBRARY_NAME}
                 INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
                 OPTIONS ${ARGS_OPTIONS})
