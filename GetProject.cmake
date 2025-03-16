@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 if (NOT DEFINED GET_PROJECT_OUTPUT_DIR)
         set(GET_PROJECT_OUTPUT_DIR "${CMAKE_HOME_DIRECTORY}/libs")
