@@ -380,7 +380,7 @@ function (_add_subdirectory)
         # Directories
         set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(LIBRARY_DIR "${GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
-        set(BUILD_DIR "${LIBRARY_DIR}/build/${BUILD_DIR_NAME}")
+        set(BUILD_DIR "${LIBRARY_DIR}/build-${CMAKE_HOST_SYSTEM_NAME}/${BUILD_DIR_NAME}")
 
         # If the library does not have CMake support. The inclusion must
         # be handled by the user.
@@ -456,7 +456,6 @@ endfunction ()
 
 function (get_project)
         set(ONE_VALUE_ARGS
-                TARGET
                 URL
                 LIBRARY_NAME
                 GIT_REPOSITORY
@@ -498,10 +497,6 @@ function (get_project)
                         "argument is set to OFF.")
         endif ()
 
-        if (NOT ARGS_DOWNLOAD_ONLY AND NOT ARGS_TARGET)
-                message(FATAL_ERROR "TARGET is required when DOWNLOAD_ONLY is OFF.")
-        endif ()
-
         if (NOT ARGS_URL AND NOT ARGS_BRANCH AND NOT ARGS_VERSION)
                 message(WARNING "VERSION and BRANCH argument is missing, downloading "
                         "latest release...")
@@ -540,7 +535,6 @@ function (get_project)
 
                 if (EXISTS ${LIBRARY_DIR} AND NOT ARGS_DOWNLOAD_ONLY)
                         _add_subdirectory(
-                                TARGET ${ARGS_TARGET}
                                 LIBRARY_NAME ${ARGS_LIBRARY_NAME}
                                 INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
                                 OPTIONS ${ARGS_OPTIONS})

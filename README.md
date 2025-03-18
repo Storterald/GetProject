@@ -12,18 +12,19 @@ just a side project I'm doing because I hate `FetchContent` and `ExternalProject
 
 `get_project()` function, **downloads** and **adds as a sub directory**
 (*can be disabled*) an external project. The download is performed at
-**configuration** time. Does **not rely** on `FetchContent` or `ExternalProject`.
+**configuration** time. Does **not rely** on `FetchContent` or
+`ExternalProject`.
 
-The **default** directory where GetProject puts the libraries in `${CMAKE_HOME_DIRECTORY}/libs`.
-If the `GET_PROJECT_OUTPUT_DIR` is set **before** including `GetProject.cmake`,
-the user defined directory will be used.
+The **default** directory where GetProject puts the libraries in
+`${CMAKE_HOME_DIRECTORY}/libs`. If the `GET_PROJECT_OUTPUT_DIR` is set 
+**before** including `GetProject.cmake`, the user defined directory will be
+used.
 
-The output will be placed in `${GET_PROJECT_OUTPUT_DIR}/${LIBRARY_NAME}`. `LIBRARY_NAME` will
-be obtained through the `GIT_REPOSITORY` if not provided.
+The output will be placed in `${GET_PROJECT_OUTPUT_DIR}/${LIBRARY_NAME}`. 
+`LIBRARY_NAME` will be obtained through the `GIT_REPOSITORY` if not provided.
 
 ```cmake
 get_project(
-        TARGET                  # The target that depends on the library
         DOWNLOAD_ONLY           # If ON the library won't be added as a sub directory
         INSTALL_ENABLED         # If the install target needs to be built
         URL                     # Library URL
@@ -36,8 +37,9 @@ get_project(
 )
 ```
 
-Setting `INSTALL_ENABLED` to true will cause the script to **configure**, **build**
-and then **install** the library. This will be done at **configure time**.
+Setting `INSTALL_ENABLED` to true will cause the script to **configure**,
+**build** and then **install** the library. This will be done at **configure
+time**.
 
 ## Examples
 
