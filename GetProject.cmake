@@ -1,12 +1,17 @@
 cmake_minimum_required(VERSION 3.10)
 
-if (NOT DEFINED GET_PROJECT_OUTPUT_DIR)
-        set(GET_PROJECT_OUTPUT_DIR "${CMAKE_HOME_DIRECTORY}/libs")
+if (DEFINED GET_PROJECT_OUTPUT_DIR AND NOT DEFINED ENV{GET_PROJECT_OUTPUT_DIR})
+        set(ENV{GET_PROJECT_OUTPUT_DIR} "${GET_PROJECT_OUTPUT_DIR}")
+endif ()
+if (NOT DEFINED ENV{GET_PROJECT_OUTPUT_DIR})
+        set(ENV{GET_PROJECT_OUTPUT_DIR} "${CMAKE_HOME_DIRECTORY}/libs")
 endif ()
 
-# Let the user define their own GetProject internal directory
-if (NOT DEFINED INTERNAL_GET_PROJECT_DIR)
-        set(INTERNAL_GET_PROJECT_DIR "${CMAKE_BINARY_DIR}/GetProject")
+if (DEFINED INTERNAL_GET_PROJECT_DIR AND NOT DEFINED ENV{INTERNAL_GET_PROJECT_DIR})
+        set(ENV{INTERNAL_GET_PROJECT_DIR} "${INTERNAL_GET_PROJECT_DIR}")
+endif ()
+if (NOT DEFINED ENV{INTERNAL_GET_PROJECT_DIR})
+        set(ENV{INTERNAL_GET_PROJECT_DIR} "${CMAKE_BINARY_DIR}/GetProject")
 endif ()
 
 # Create GetProject internal directory if it does not exist
@@ -42,6 +47,55 @@ function (_check_internet_connection)
         endif ()
 endfunction ()
 
+function (_validate_args)
+        set(ONE_VALUE_ARGS
+                URL
+                GIT_REPOSITORY
+                FILE
+                LIBRARY_NAME
+                INSTALL_ENABLED
+                DOWNLOAD_ONLY
+                BRANCH
+                KEEP_UPDATED
+                VERSION)
+        set(MULTI_VALUE_ARGS
+                OPTIONS)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
+
+        if (ARGS_URL AND NOT ARGS_LIBRARY_NAME)
+                message(FATAL_ERROR "LIBRARY_NAME is required when passing an URL.")
+        endif ()
+
+        if (NOT ARGS_URL AND NOT ARGS_GIT_REPOSITORY)
+                message(FATAL_ERROR "Either URL, FILE or GIT_REPOSITORY is required "
+                                    "for get_project to do something.")
+        endif ()
+
+        if (NOT ARGS_BRANCH AND NOT "${ARGS_KEEP_UPDATED}" STREQUAL "")
+                message(WARNING "KEEP_UPDATED argument is only used when the "
+                                "BRANCH argument is passed.")
+        endif ()
+
+        if (ARGS_DOWNLOAD_ONLY AND ARGS_OPTIONS)
+                message(WARNING "OPTIONS argument is only used when the DOWNLOAD_ONLY "
+                                "argument is set to OFF.")
+        endif ()
+
+        if (ARGS_GIT_REPOSITORY AND NOT ARGS_BRANCH AND NOT ARGS_VERSION)
+                message(WARNING "VERSION and BRANCH argument is missing, downloading "
+                                "latest public release...")
+        endif ()
+
+        if (ARGS_FILE AND ARGS_INSTALL_ENABLED)
+                message(WARNING "INSTALL_ENABLED argument is only used when the FILE "
+                                "argument is set to OFF.")
+        endif ()
+
+        if (ARGS_FILE AND NOT ARGS_URL)
+                message(FATAL_ERROR "FILE boolean argument must be used along URL")
+        endif ()
+endfunction ()
+
 function (_get_latest_tag)
         set(ONE_VALUE_ARGS
                 GIT_REPOSITORY
@@ -51,14 +105,13 @@ function (_get_latest_tag)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
         if (NOT ARGS_GIT_REPOSITORY OR NOT ARGS_LIBRARY_NAME)
-                message(FATAL_ERROR
-                        "Missing parameters in function call to "
-                        "_get_latest_tag, please report this at the url "
-                        "https://github.com/Storterald/GetProject/issues.")
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_get_latest_tag, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Directories
-        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "$ENV{INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/get_latest_tag")
 
         # Commands
@@ -129,29 +182,29 @@ endfunction ()
 function (_download_file)
         set(ONE_VALUE_ARGS
                 URL
+                DIRECTORY
                 HASH
-                HASH_TYPE)
+                HASH_TYPE
+                OUTPUT_HASH)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_URL)
-                message(FATAL_ERROR
-                        "Missing parameters in function call to "
-                        "_download_file, please report this at the url "
-                        "https://github.com/Storterald/GetProject/issues.")
+        if (NOT ARGS_URL OR NOT ARGS_DIRECTORY)
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_download_file, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Get archive name and extension
-        get_filename_component(FILE_NAME ${ARGS_URL} NAME_WE)
-        get_filename_component(FILE_EXT ${ARGS_URL} EXT)
+        get_filename_component(FILE_NAME ${ARGS_URL} NAME)
 
-        set(FILE_PATH "${GET_PROJECT_OUTPUT_DIR}/${FILE_NAME}${FILE_EXT}")
+        set(FILE_PATH "${ARGS_DIRECTORY}/${FILE_NAME}")
 
         if (ARGS_HASH)
                 # Check if HASH_TYPE parameter was given
                 if (NOT ARGS_HASH_TYPE)
                         message(FATAL_ERROR "HASH_TYPE must be provided when "
-                                "passing HASH parameter to "
-                                "download_file_from_url.")
+                                            "passing HASH parameter to "
+                                            "download_file_from_url.")
                 endif ()
 
                 # Download file with hash comparison
@@ -166,11 +219,36 @@ function (_download_file)
 
         # Check if response is good
         if (NOT RESPONSE EQUAL 0)
-                message(FATAL_ERROR "Failed to download file '${FILE_NAME}${FILE_EXT}', "
-                        "response: '${RESPONSE}'.")
+                message(FATAL_ERROR "Failed to download file '${FILE_NAME}', "
+                                    "response: '${RESPONSE}'.")
         else ()
-                message(STATUS "Correctly downloaded file '${FILE_NAME}${FILE_EXT}'.")
+                message(STATUS "Correctly downloaded file '${FILE_NAME}'.")
         endif()
+
+        file(MD5 ${FILE_PATH} NEW_HASH)
+        set(${ARGS_OUTPUT_HASH} ${NEW_HASH} PARENT_SCOPE)
+endfunction ()
+
+function (_extract_archive)
+        set(ONE_VALUE_ARGS
+                LIBRARY_NAME)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
+
+        # Directories and files
+        set(INTERNAL_LIBRARY_DIR "$ENV{INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(TMP_DIR "${INTERNAL_LIBRARY_DIR}/.tmp")
+        set(LIBRARY_DIR "$ENV{GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
+        
+        # Create temporary directory and extract archive there
+        file(MAKE_DIRECTORY ${TMP_DIR})
+        file(ARCHIVE_EXTRACT INPUT ${FILE_PATH} DESTINATION ${TMP_DIR})
+
+        # Move the extracted content to library directory
+        file(GLOB EXTRACTED_CONTENT "${TMP_DIR}/*/**")
+        file(COPY ${EXTRACTED_CONTENT} DESTINATION ${LIBRARY_DIR})
+
+        # Clean up the temporary directory
+        file(REMOVE_RECURSE ${TMP_DIR})
 endfunction ()
 
 function (_is_directory_empty)
@@ -180,10 +258,9 @@ function (_is_directory_empty)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
         if (NOT ARGS_LIBRARY_DIR OR NOT ARGS_OUTPUT_VARIABLE)
-                message(FATAL_ERROR
-                        "Missing parameters in function call to "
-                        "_is_directory_empty, please report this at the url "
-                        "https://github.com/Storterald/GetProject/issues.")
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_is_directory_empty, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Used to check if directory is empty
@@ -205,81 +282,61 @@ function (_download_library_url)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
         if (NOT ARGS_URL OR NOT ARGS_LIBRARY_NAME)
-                message(FATAL_ERROR
-                        "Missing parameters in function call to "
-                        "_download_library_url, please report this at the url "
-                        "https://github.com/Storterald/GetProject/issues.")
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_download_library_url, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Directories and files
-        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "$ENV{INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/download_library")
-        set(TMP_DIR "${INTERNAL_LIBRARY_DIR}/.tmp")
-        set(LIBRARY_DIR "${GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
-        set(HASH_FILE "${INTERNAL_LIBRARY_DIR}/hash")
+        set(LIBRARY_DIR "$ENV{GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(HASH_VAR_NAME "GetProject_${ARGS_LIBRARY_NAME}_HASH")
 
         # Create library internal directory
         if (NOT EXISTS ${INTERNAL_LIBRARY_DIR})
                 file(MAKE_DIRECTORY ${INTERNAL_LIBRARY_DIR})
                 file(MAKE_DIRECTORY ${CACHE_DIR})
-        else ()
-                # This should always be true unless the user manually
-                # deleted the hash file
-                if (EXISTS ${HASH_FILE})
-                        file(READ ${HASH_FILE} HASH)
-                endif ()
         endif ()
 
         # Download library archive
         _download_file(
                 URL ${ARGS_URL}
                 DIRECTORY ${CACHE_DIR}
-                HASH ${HASH}
-                HASH_TYPE "MD5")
-
-        # Get MD5 hash of the downloaded file and save it in NEW_HASH
-        file(GLOB FILE_PATH "${CACHE_DIR}/**")
-        file(MD5 ${FILE_PATH} NEW_HASH)
+                HASH ${${HASH_VAR_NAME}}
+                HASH_TYPE "MD5"
+                OUTPUT_HASH NEW_HASH)
 
         # Don't waste time extracting stuff again if hashes match
-        if (HASH AND "${NEW_HASH}" STREQUAL "${HASH}")
+        if (DEFINED ${HASH_VAR_NAME} AND "${NEW_HASH}" STREQUAL "${${HASH_VAR_NAME}}")
                 _is_directory_empty(
                         LIBRARY_DIR ${LIBRARY_DIR}
                         OUTPUT_VARIABLE LIBRARY_DIR_EMPTY)
 
                 if (NOT LIBRARY_DIR_EMPTY)
                         message(STATUS "Old and new downloaded file hashes match, "
-                                "but '${ARGS_LIBRARY_NAME}' directory does "
-                                "not exist / is empty, extracting...")
+                                       "but '${ARGS_LIBRARY_NAME}' directory does "
+                                       "not exist / is empty, extracting...")
                 else ()
                         message(STATUS "Old and new downloaded file hashes match. "
-                                "Not Extracting.")
+                                       "Not Extracting.")
 
                         return()
                 endif ()
         else ()
                 message(STATUS "Old and new downloaded file hashes don't match, "
-                        "extracting...")
+                               "extracting...")
         endif ()
 
-        # Write hash file only if its different
-        file(WRITE ${HASH_FILE} ${NEW_HASH})
+        set(${HASH_VAR_NAME} ${NEW_HASH} CACHE STRING "${ARGS_LIBRARY_NAME} hash" FORCE)
 
         # Delete old extracted data
         if (EXISTS ${LIBRARY_DIR})
                 file(REMOVE_RECURSE ${LIBRARY_DIR})
         endif ()
 
-        # Create temporary directory and extract archive there
-        file(MAKE_DIRECTORY ${TMP_DIR})
-        file(ARCHIVE_EXTRACT INPUT ${FILE_PATH} DESTINATION ${TMP_DIR})
-
-        # Move the extracted content to library directory
-        file(GLOB EXTRACTED_CONTENT "${TMP_DIR}/*/**")
-        file(COPY ${EXTRACTED_CONTENT} DESTINATION ${LIBRARY_DIR})
-
-        # Clean up the temporary directory
-        file(REMOVE_RECURSE ${TMP_DIR})
+        _extract_archive(
+                LIBRARY_NAME ${ARGS_LIBRARY_NAME})
 endfunction ()
 
 function (_validate_git_repo)
@@ -287,10 +344,9 @@ function (_validate_git_repo)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
         if (NOT ARGS_GIT_REPOSITORY)
-                message(FATAL_ERROR
-                        "Missing parameters in function call to "
-                        "_validate_git_repo, please report this at the url "
-                        "https://github.com/Storterald/GetProject/issues.")
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_validate_git_repo, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # If connected to the internet validate the git repository
@@ -317,10 +373,9 @@ function (_download_library_git)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
         if (NOT ARGS_GIT_REPOSITORY OR (NOT ARGS_BRANCH AND NOT ARGS_VERSION) OR NOT ARGS_LIBRARY_DIR)
-                message(FATAL_ERROR
-                        "Missing parameters in function call to "
-                        "_download_library_git, please report this at the url "
-                        "https://github.com/Storterald/GetProject/issues.")
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_download_library_git, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Save the version or the branch in the COMMAND_BRANCH variable,
@@ -368,22 +423,21 @@ function (_add_subdirectory)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
         if (NOT ARGS_LIBRARY_NAME)
-                message(FATAL_ERROR
-                        "Missing parameters in function call to "
-                        "_add_subdirectory, please report this at the url "
-                        "https://github.com/Storterald/GetProject/issues.")
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_add_subdirectory, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Directories
-        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
-        set(LIBRARY_DIR "${GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "$ENV{INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(LIBRARY_DIR "$ENV{GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
 
         # If the library does not have CMake support. The inclusion must
         # be handled by the user.
         if (NOT EXISTS "${LIBRARY_DIR}/CMakeLists.txt")
                 message(WARNING "CMakeLists.txt file not found in library "
-                        "'${ARGS_LIBRARY_NAME}'. Not adding as a "
-                        "subdirectory.")
+                                "'${ARGS_LIBRARY_NAME}'. Not adding as a "
+                                "subdirectory.")
                 return ()
         endif ()
 
@@ -395,7 +449,7 @@ function (_add_subdirectory)
         foreach (OPTION IN LISTS ARGS_OPTIONS)
                 if (NOT ${OPTION} MATCHES ${REGEXP})
                         message(FATAL_ERROR "Option '${OPTION}' not recognized. "
-                                "Use the format NAME=VALUE")
+                                            "Use the format NAME=VALUE")
                 endif ()
 
                 string(REGEX MATCH ${REGEXP} OUT ${OPTION})
@@ -455,8 +509,9 @@ endfunction ()
 function (get_project)
         set(ONE_VALUE_ARGS
                 URL
-                LIBRARY_NAME
                 GIT_REPOSITORY
+                FILE
+                LIBRARY_NAME
                 INSTALL_ENABLED
                 DOWNLOAD_ONLY
                 BRANCH
@@ -466,44 +521,25 @@ function (get_project)
                 OPTIONS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        if (NOT ARGS_URL)
+        if (ARGS_GIT_REPOSITORY)
                 find_package(Git)
                 if (NOT GIT_FOUND)
-                        message(FATAL_ERROR
-                                "Git is required to use GetProject without the "
-                                "URL parameter. You can download git at "
-                                "https://git-scm.com/downloads")
+                        message(FATAL_ERROR "Git is required to use GetProject "
+                                            "with the GIT_REPOSITORY parameter. "
+                                            "You can download git at "
+                                            "https://git-scm.com/downloads")
                 endif ()
         endif ()
 
-        if (ARGS_URL AND NOT ARGS_LIBRARY_NAME)
-                message(FATAL_ERROR "LIBRARY_NAME is required when passing an URL.")
-        endif ()
+        _validate_args(${ARGV})
 
-        if (NOT ARGS_URL AND NOT ARGS_GIT_REPOSITORY)
-                message(FATAL_ERROR "Either URL or GIT_REPOSITORY is required "
-                        "for get_library to do something.")
-        endif ()
-
-        if (NOT ARGS_BRANCH AND NOT "${ARGS_KEEP_UPDATED}" STREQUAL "")
-                message(WARNING "KEEP_UPDATED argument is only used when the "
-                        "BRANCH argument is passed.")
-        endif ()
-
-        if (ARGS_DOWNLOAD_ONLY AND ARGS_OPTIONS)
-                message(WARNING "OPTIONS argument is only used when the DOWNLOAD_ONLY "
-                        "argument is set to OFF.")
-        endif ()
-
-        if (NOT ARGS_URL AND NOT ARGS_BRANCH AND NOT ARGS_VERSION)
-                message(WARNING "VERSION and BRANCH argument is missing, downloading "
-                        "latest release...")
-        endif ()
-
-        # Check for internet connection
         _check_internet_connection(
                 OUTPUT_VARIABLE IS_CONNECTED)
 
+        if (ARGS_FILE)
+                set(ARGS_DOWNLOAD_ONLY ON)
+        endif ()
+        
         # If the library is downloaded via git, validate the repo and get the name.
         if (ARGS_GIT_REPOSITORY)
                 # If connected to the internet validate the git repository
@@ -521,26 +557,25 @@ function (get_project)
         endif ()
 
         # Directories and files
-        set(INTERNAL_LIBRARY_DIR "${INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
-        set(LIBRARY_DIR "${GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
-        set(VERSION_FILE "${INTERNAL_LIBRARY_DIR}/version")
+        set(INTERNAL_LIBRARY_DIR "$ENV{INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(LIBRARY_DIR "$ENV{GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
 
         if (NOT IS_CONNECTED)
-                message(STATUS
-                        "GetProject: Adding '${ARGS_LIBRARY_NAME}'. Since no "
-                        "internet connection has been found, nothing can be "
-                        "downloaded.")
+                message(STATUS "GetProject: Adding '${ARGS_LIBRARY_NAME}'. Since "
+                               "no internet connection has been detected, nothing "
+                               "can be downloaded.")
 
-                if (EXISTS ${LIBRARY_DIR} AND NOT ARGS_DOWNLOAD_ONLY)
-                        _add_subdirectory(
-                                LIBRARY_NAME ${ARGS_LIBRARY_NAME}
-                                INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
-                                OPTIONS ${ARGS_OPTIONS})
+                if (EXISTS ${LIBRARY_DIR})
+                        if (NOT ARGS_DOWNLOAD_ONLY)
+                                _add_subdirectory(
+                                        LIBRARY_NAME ${ARGS_LIBRARY_NAME}
+                                        INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
+                                        OPTIONS ${ARGS_OPTIONS})
+                                set(${ARGS_LIBRARY_NAME}_ADDED ON PARENT_SCOPE)
+                        endif ()
 
                         set(${ARGS_LIBRARY_NAME}_DOWNLOADED ON PARENT_SCOPE)
-                        set(${ARGS_LIBRARY_NAME}_ADDED ON PARENT_SCOPE)
                         set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
-                        set(${ARGS_LIBRARY_NAME}_BINARY ${${ARGS_LIBRARY_NAME}_BINARY} PARENT_SCOPE)
                 endif ()
 
                 return ()
@@ -548,7 +583,7 @@ function (get_project)
 
         message(STATUS "GetProject: Adding '${ARGS_LIBRARY_NAME}'.")
 
-        if (NOT ARGS_URL AND NOT ARGS_BRANCH)
+        if (ARGS_GIT_REPOSITORY AND NOT ARGS_BRANCH)
                 # Check if the given version is set as null or latest, if so
                 # fetch the latest release.
                 string(TOUPPER "${ARGS_VERSION}" CAPS_VERSION)
@@ -561,18 +596,15 @@ function (get_project)
                 endif ()
 
                 # Save the library version.
-                if (EXISTS ${INTERNAL_LIBRARY_DIR} AND EXISTS ${VERSION_FILE})
-                        file(READ ${VERSION_FILE} DOWNLOADED_VERSION)
+                set(VERSION_CACHE_VARIABLE_NAME "GetProject_${ARGS_LIBRARY_NAME}_VERSION")
+                if (DEFINED ${VERSION_CACHE_VARIABLE_NAME})
+                        set(PREVIOUS_VERSION "${${VERSION_CACHE_VARIABLE_NAME}}")
 
-                        if (NOT "${DOWNLOADED_VERSION}" STREQUAL "${ARGS_VERSION}")
+                        if (NOT ${PREVIOUS_VERSION} STREQUAL "${ARGS_VERSION}")
                                 message(STATUS "Version mismatch for library "
-                                        "'${ARGS_LIBRARY_NAME}'. "
-                                        "Deleting and downloading...")
-
-                                # If version does not match delete existing library
-                                # and the version file.
+                                               "'${ARGS_LIBRARY_NAME}'. "
+                                               "Deleting and downloading...")
                                 file(REMOVE_RECURSE ${LIBRARY_DIR})
-                                file(REMOVE ${VERSION_FILE})
                         else ()
                                 _is_directory_empty(
                                         LIBRARY_DIR ${LIBRARY_DIR}
@@ -584,19 +616,26 @@ function (get_project)
                                         endif ()
                                 endif ()
                         endif ()
-                else ()
-                        file(MAKE_DIRECTORY ${INTERNAL_LIBRARY_DIR})
                 endif ()
 
-                # Create current version file.
-                file(WRITE "${INTERNAL_LIBRARY_DIR}/version" ${ARGS_VERSION})
+                set(${VERSION_CACHE_VARIABLE_NAME} ${ARGS_VERSION} CACHE STRING "${ARGS_LIBRARY_NAME} version" FORCE)
         endif ()
 
-        if (ARGS_URL)
+        if (ARGS_FILE)
+                set(HASH_VAR_NAME "GetProject_${ARGS_LIBRARY_NAME}_HASH")
+                _download_file(
+                        URL ${ARGS_URL}
+                        DIRECTORY ${LIBRARY_DIR}
+                        HASH ${${HASH_VAR_NAME}}
+                        HASH_TYPE "MD5"
+                        OUTPUT_HASH NEW_HASH)
+
+                set(${HASH_VAR_NAME} ${NEW_HASH} CACHE STRING "${ARGS_LIBRARY_NAME} hash" FORCE)
+        elseif (ARGS_URL)
                 _download_library_url(
                         URL ${ARGS_URL}
                         LIBRARY_NAME ${ARGS_LIBRARY_NAME})
-        else ()
+        elseif (ARGS_GIT_REPOSITORY)
                 _download_library_git(
                         GIT_REPOSITORY ${ARGS_GIT_REPOSITORY}
                         LIBRARY_DIR ${LIBRARY_DIR}
@@ -609,7 +648,7 @@ function (get_project)
         set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
 
         if (ARGS_DOWNLOAD_ONLY)
-                return()
+                return ()
         endif ()
 
         _add_subdirectory(
