@@ -1,17 +1,20 @@
 # DO NOT USE
 
 This code is still in `BETA` and will **likely not work** when used. This is
-just a side project I'm doing because I hate `FetchContent` and `ExternalProject`.
+just a side project that exists just because I hate `FetchContent` and `ExternalProject`.
 
 ### Known Issues
 
  - **Install step** is now extremely **slow**, as it requires the library to be
    *configured* and *built*.
+ - **common output dir** all dependencies from all levels should be in the same dir, already
+   technically implemented, but an environment variable should be used.
+ - **No package version checks** there are currently no checks for versions mismatches / incompatibilities
 
 # CMake GetProject
 
 `get_project()` function, **downloads** and **adds as a sub directory**
-(*can be disabled*) an external project. The download is performed at
+(*can be disabled*) an external library. The download is performed at
 **configuration** time. Does **not rely** on `FetchContent` or
 `ExternalProject`.
 
@@ -41,14 +44,13 @@ Setting `INSTALL_ENABLED` to true will cause the script to **configure**,
 **build** and then **install** the library. This will be done at **configure
 time**.
 
-## Examples
+## Usage
 
 **Downloads** the project from a **URL** and **builds** and **installs** it.
 The library will be placed in `${DIRECTORY}/${LIBRARY_NAME}`.
 
 ```cmake
 get_project(
-        TARGET ${PROJECT_NAME}
         INSTALL_ENABLED ON
         URL "https://github.com/torvalds/linux/archive/refs/tags/v6.12.zip"
         LIBRARY_NAME "linux-kernel"
@@ -69,21 +71,19 @@ get_project(
 )
 ```
 
-**Download** and **build** the library from a **git repository** and a **version**.
+**Downloads** and **builds** the library from a **git repository** and a **version**.
 
 ```cmake
 get_project(
-        TARGET ${PROJECT_NAME}
         GIT_REPOSITORY "https://github.com/torvalds/linux.git"
         VERSION "v6.3-rc1"
 )
 ```
 
-**Download** and **build** the **latest** version of the library from a **git repository**.
+**Downloads** and **builds** the **latest** version of the library from a **git repository**.
 
 ```cmake
 get_project(
-        TARGET ${PROJECT_NAME}
         GIT_REPOSITORY "https://github.com/torvalds/linux.git"
         VERSION LATEST
 )
