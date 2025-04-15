@@ -15,8 +15,8 @@ if (NOT DEFINED ENV{INTERNAL_GET_PROJECT_DIR})
 endif ()
 
 # Create GetProject internal directory if it does not exist
-if (NOT EXISTS ${INTERNAL_GET_PROJECT_DIR})
-        file(MAKE_DIRECTORY ${INTERNAL_GET_PROJECT_DIR})
+if (NOT EXISTS $ENV{INTERNAL_GET_PROJECT_DIR})
+        file(MAKE_DIRECTORY $ENV{INTERNAL_GET_PROJECT_DIR})
 endif ()
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -67,13 +67,22 @@ function (_validate_args)
         endif ()
 
         if (NOT ARGS_URL AND NOT ARGS_GIT_REPOSITORY)
-                message(FATAL_ERROR "Either URL, FILE or GIT_REPOSITORY is required "
+                message(FATAL_ERROR "Either URL or GIT_REPOSITORY is required "
                                     "for get_project to do something.")
+        endif ()
+
+        if (ARGS_FILE AND NOT ARGS_URL)
+                message(FATAL_ERROR "FILE boolean argument must be used along URL")
         endif ()
 
         if (NOT ARGS_BRANCH AND NOT "${ARGS_KEEP_UPDATED}" STREQUAL "")
                 message(WARNING "KEEP_UPDATED argument is only used when the "
                                 "BRANCH argument is passed.")
+        endif ()
+
+        if (ARGS_BRANCH AND ARGS_VERSION)
+                message(WARNING "VERSION argument is only used when downloading "
+                                "a release, not a specific branch.")
         endif ()
 
         if (ARGS_DOWNLOAD_ONLY AND ARGS_OPTIONS)
@@ -89,10 +98,6 @@ function (_validate_args)
         if (ARGS_FILE AND ARGS_INSTALL_ENABLED)
                 message(WARNING "INSTALL_ENABLED argument is only used when the FILE "
                                 "argument is set to OFF.")
-        endif ()
-
-        if (ARGS_FILE AND NOT ARGS_URL)
-                message(FATAL_ERROR "FILE boolean argument must be used along URL")
         endif ()
 endfunction ()
 
@@ -272,6 +277,54 @@ function (_is_directory_empty)
                 set(${ARGS_OUTPUT_VARIABLE} ON PARENT_SCOPE)
         else ()
                 set(${ARGS_OUTPUT_VARIABLE} OFF PARENT_SCOPE)
+        endif ()
+endfunction ()
+
+function (_check_version_collisions)
+        set(ONE_VALUE_ARGS
+                EXISTENT_VERSION
+                NEW_VERSION
+                OUTPUT_SHOULD_CLEAR
+                OUTPUT_SHOULD_SKIP_DOWNLOAD)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
+
+        if (${ARGS_EXISTENT_VERSION} VERSION_EQUAL ${ARGS_NEW_VERSION})
+                set(${ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD} ON PARENT_SCOPE)
+                return ()
+        endif ()
+
+        string(REPLACE "." ";" EXISTENT_VERSION_LIST ${ARGS_EXISTENT_VERSION})
+        list(GET EXISTENT_VERSION_LIST 0 EXISTENT_MAJOR)
+        list(GET EXISTENT_VERSION_LIST 1 EXISTENT_MINOR)
+        list(GET EXISTENT_VERSION_LIST 2 EXISTENT_PATCH)
+        
+        string(REPLACE "." ";" NEW_VERSION_LIST ${ARGS_NEW_VERSION})
+        list(GET NEW_VERSION_LIST 0 NEW_MAJOR)
+        list(GET NEW_VERSION_LIST 1 NEW_MINOR)
+        list(GET NEW_VERSION_LIST 2 NEW_PATCH)
+
+        if (${ARGS_EXISTENT_VERSION} VERSION_GREATER ${ARGS_NEW_VERSION})
+                if (NOT "${PREVIOUS_MAJOR}" STREQUAL "${CURRENT_MAJOR}")
+                        message(WARNING "${ARGS_LIBRARY_NAME} requires the "
+                                        "version '${ARGS_NEW_VERSION}', which is "
+                                        "older than the currently used one "
+                                        "(${ARGS_EXISTENT_VERSION}) and is missing "
+                                        "a major update.")
+                endif ()
+
+                # If the already present version is greater
+                # than the requested one, do nothing.
+                set(${ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD} ON PARENT_SCOPE)
+        else ()
+                if (NOT "${PREVIOUS_MAJOR}" STREQUAL "${CURRENT_MAJOR}")
+                        message(WARNING "${ARGS_LIBRARY_NAME} requires the "
+                                        "version '${ARGS_NEW_VERSION}', which is "
+                                        "newer than the currently used one "
+                                        "(${ARGS_EXISTENT_VERSION}), which is missing "
+                                        "a major update.")
+                endif ()
+
+                set(${ARGS_OUTPUT_SHOULD_CLEAR} ON PARENT_SCOPE)
         endif ()
 endfunction ()
 
@@ -456,7 +509,7 @@ function (_add_subdirectory)
                 set(${CMAKE_MATCH_1} ${CMAKE_MATCH_2})
         endforeach ()
 
-        add_subdirectory(${LIBRARY_DIR})
+        add_subdirectory(${LIBRARY_DIR} EXCLUDE_FROM_ALL)
 
         # To install a directory it's required that the library is built.
         # TODO find something better
@@ -581,8 +634,6 @@ function (get_project)
                 return ()
         endif ()
 
-        message(STATUS "GetProject: Adding '${ARGS_LIBRARY_NAME}'.")
-
         if (ARGS_GIT_REPOSITORY AND NOT ARGS_BRANCH)
                 # Check if the given version is set as null or latest, if so
                 # fetch the latest release.
@@ -594,26 +645,30 @@ function (get_project)
                                 CLEAR OFF
                                 OUTPUT_VARIABLE ARGS_VERSION)
                 endif ()
+        endif ()
 
+        message(STATUS "GetProject: Adding '${ARGS_LIBRARY_NAME}'.")
+
+        if (ARGS_GIT_REPOSITORY AND NOT ARGS_BRANCH)
                 # Save the library version.
                 set(VERSION_CACHE_VARIABLE_NAME "GetProject_${ARGS_LIBRARY_NAME}_VERSION")
                 if (DEFINED ${VERSION_CACHE_VARIABLE_NAME})
-                        set(PREVIOUS_VERSION "${${VERSION_CACHE_VARIABLE_NAME}}")
+                        set(EXISTENT_VERSION "${${VERSION_CACHE_VARIABLE_NAME}}")
+                        set(NEW_VERSION "${ARGS_VERSION}")
 
-                        if (NOT ${PREVIOUS_VERSION} STREQUAL "${ARGS_VERSION}")
-                                message(STATUS "Version mismatch for library "
-                                               "'${ARGS_LIBRARY_NAME}'. "
-                                               "Deleting and downloading...")
-                                file(REMOVE_RECURSE ${LIBRARY_DIR})
-                        else ()
-                                _is_directory_empty(
-                                        LIBRARY_DIR ${LIBRARY_DIR}
-                                        OUTPUT_VARIABLE LIBRARY_DIR_EMPTY)
+                        _check_version_collisions(
+                                EXISTENT_VERSION ${PREVIOUS_VERSION}
+                                NEW_VERSION ${NEW_VERSION}
+                                OUTPUT_SHOULD_CLEAR SHOULD_CLEAR
+                                OUTPUT_SHOULD_SKIP_DOWNLOAD SHOULD_SKIP_DOWNLOAD)
 
-                                if (LIBRARY_DIR_EMPTY)
-                                        if (EXISTS ${LIBRARY_DIR})
-                                                file(REMOVE_RECURSE ${LIBRARY_DIR})
-                                        endif ()
+                        _is_directory_empty(
+                                LIBRARY_DIR ${LIBRARY_DIR}
+                                OUTPUT_VARIABLE LIBRARY_DIR_EMPTY)
+
+                        if (SHOULD_CLEAR OR LIBRARY_DIR_EMPTY)
+                                if (EXISTS ${LIBRARY_DIR})
+                                        file(REMOVE_RECURSE ${LIBRARY_DIR})
                                 endif ()
                         endif ()
                 endif ()
@@ -635,7 +690,7 @@ function (get_project)
                 _download_library_url(
                         URL ${ARGS_URL}
                         LIBRARY_NAME ${ARGS_LIBRARY_NAME})
-        elseif (ARGS_GIT_REPOSITORY)
+        elseif (ARGS_GIT_REPOSITORY AND NOT SHOULD_SKIP_DOWNLOAD)
                 _download_library_git(
                         GIT_REPOSITORY ${ARGS_GIT_REPOSITORY}
                         LIBRARY_DIR ${LIBRARY_DIR}
