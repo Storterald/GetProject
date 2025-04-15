@@ -288,28 +288,39 @@ function (_check_version_collisions)
                 OUTPUT_SHOULD_SKIP_DOWNLOAD)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (${ARGS_EXISTENT_VERSION} VERSION_EQUAL ${ARGS_NEW_VERSION})
+        set(REGEX_VERSION "^v?(([0-9]+)(\\.([0-9]+))?(\\.([0-9]+))?)(-[a-zA-Z_0-9]+)?$")
+        if (NOT ${NEW_VERSION} MATCHES ${REGEX_VERSION})
+                message(WARNING "Invalid version format from the tag '${NEW_VERSION}'.")
+                set(${OUTPUT_SHOULD_CLEAR} ON PARENT_SCOPE)
+                return ()
+        endif ()
+
+        string(REGEX MATCH ${REGEX_VERSION} MATCH ${ARGS_EXISTENT_VERSION})
+        set(EXISTENT_VERSION_FULL "${CMAKE_MATCH_1}${CMAKE_MATCH_7}")
+        set(EXISTENT_VERSION ${CMAKE_MATCH_1})
+        set(EXISTENT_MAJOR ${CMAKE_MATCH_2})
+        set(EXISTENT_MINOR ${CMAKE_MATCH_4})
+        set(EXISTENT_PATCH ${CMAKE_MATCH_6})
+
+        string(REGEX MATCH ${REGEX_VERSION} MATCH ${ARGS_NEW_VERSION})
+        set(NEW_VERSION_FULL "${CMAKE_MATCH_1}${CMAKE_MATCH_7}")
+        set(NEW_VERSION ${CMAKE_MATCH_1})
+        set(NEW_MAJOR ${CMAKE_MATCH_2})
+        set(NEW_MINOR ${CMAKE_MATCH_4})
+        set(NEW_PATCH ${CMAKE_MATCH_6})
+
+        if (${EXISTENT_VERSION} VERSION_EQUAL ${NEW_VERSION})
                 set(${ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD} ON PARENT_SCOPE)
                 return ()
         endif ()
 
-        string(REPLACE "." ";" EXISTENT_VERSION_LIST ${ARGS_EXISTENT_VERSION})
-        list(GET EXISTENT_VERSION_LIST 0 EXISTENT_MAJOR)
-        list(GET EXISTENT_VERSION_LIST 1 EXISTENT_MINOR)
-        list(GET EXISTENT_VERSION_LIST 2 EXISTENT_PATCH)
-        
-        string(REPLACE "." ";" NEW_VERSION_LIST ${ARGS_NEW_VERSION})
-        list(GET NEW_VERSION_LIST 0 NEW_MAJOR)
-        list(GET NEW_VERSION_LIST 1 NEW_MINOR)
-        list(GET NEW_VERSION_LIST 2 NEW_PATCH)
-
-        if (${ARGS_EXISTENT_VERSION} VERSION_GREATER ${ARGS_NEW_VERSION})
+        if (${EXISTENT_VERSION} VERSION_GREATER ${NEW_VERSION})
                 if (NOT "${PREVIOUS_MAJOR}" STREQUAL "${CURRENT_MAJOR}")
                         message(WARNING "${ARGS_LIBRARY_NAME} requires the "
-                                        "version '${ARGS_NEW_VERSION}', which is "
+                                        "version '${NEW_VERSION_FULL}', which is "
                                         "older than the currently used one "
-                                        "(${ARGS_EXISTENT_VERSION}) and is missing "
-                                        "a major update.")
+                                        "(${EXISTENT_VERSION_FULL}) and is "
+                                        "missing a major update.")
                 endif ()
 
                 # If the already present version is greater
@@ -318,10 +329,10 @@ function (_check_version_collisions)
         else ()
                 if (NOT "${PREVIOUS_MAJOR}" STREQUAL "${CURRENT_MAJOR}")
                         message(WARNING "${ARGS_LIBRARY_NAME} requires the "
-                                        "version '${ARGS_NEW_VERSION}', which is "
+                                        "version '${NEW_VERSION_FULL}', which is "
                                         "newer than the currently used one "
-                                        "(${ARGS_EXISTENT_VERSION}), which is missing "
-                                        "a major update.")
+                                        "(${EXISTENT_VERSION_FULL}), which is "
+                                        "missing a major update.")
                 endif ()
 
                 set(${ARGS_OUTPUT_SHOULD_CLEAR} ON PARENT_SCOPE)
@@ -657,7 +668,7 @@ function (get_project)
                         set(NEW_VERSION "${ARGS_VERSION}")
 
                         _check_version_collisions(
-                                EXISTENT_VERSION ${PREVIOUS_VERSION}
+                                EXISTENT_VERSION ${EXISTENT_VERSION}
                                 NEW_VERSION ${NEW_VERSION}
                                 OUTPUT_SHOULD_CLEAR SHOULD_CLEAR
                                 OUTPUT_SHOULD_SKIP_DOWNLOAD SHOULD_SKIP_DOWNLOAD)
