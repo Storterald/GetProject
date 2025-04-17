@@ -681,6 +681,7 @@ function (get_project)
                                 OUTPUT_VARIABLE LIBRARY_DIR_EMPTY)
 
                         if (SHOULD_CLEAR OR LIBRARY_DIR_EMPTY)
+                                set(SHOULD_SKIP_DOWNLOAD OFF)
                                 if (EXISTS ${LIBRARY_DIR})
                                         file(REMOVE_RECURSE ${LIBRARY_DIR})
                                 endif ()
