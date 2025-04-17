@@ -496,6 +496,10 @@ function (_add_subdirectory)
         set(INTERNAL_LIBRARY_DIR "$ENV{INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(LIBRARY_DIR "$ENV{GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
 
+        if (NOT EXISTS ${INTERNAL_LIBRARY_DIR})
+                file(MAKE_DIRECTORY ${INTERNAL_LIBRARY_DIR})
+        endif ()
+
         # If the library does not have CMake support. The inclusion must
         # be handled by the user.
         if (NOT EXISTS "${LIBRARY_DIR}/CMakeLists.txt")
@@ -520,7 +524,7 @@ function (_add_subdirectory)
                 set(${CMAKE_MATCH_1} ${CMAKE_MATCH_2})
         endforeach ()
 
-        add_subdirectory(${LIBRARY_DIR} EXCLUDE_FROM_ALL)
+        add_subdirectory(${LIBRARY_DIR} ${INTERNAL_LIBRARY_DIR} EXCLUDE_FROM_ALL)
 
         # To install a directory it's required that the library is built.
         # TODO find something better
@@ -621,7 +625,6 @@ function (get_project)
         endif ()
 
         # Directories and files
-        set(INTERNAL_LIBRARY_DIR "$ENV{INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
         set(LIBRARY_DIR "$ENV{GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
 
         if (NOT IS_CONNECTED)
