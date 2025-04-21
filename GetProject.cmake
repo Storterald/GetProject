@@ -226,8 +226,6 @@ function (_download_file)
         if (NOT RESPONSE EQUAL 0)
                 message(FATAL_ERROR "Failed to download file '${FILE_NAME}', "
                                     "response: '${RESPONSE}'.")
-        else ()
-                message(STATUS "Correctly downloaded file '${FILE_NAME}'.")
         endif()
 
         file(MD5 ${FILE_PATH} NEW_HASH)
