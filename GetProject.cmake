@@ -23,30 +23,6 @@ endif ()
 # HELPER FUNCTIONS
 # ----------------------------------------------------------------------------------------------------------------------
 
-function (_check_internet_connection)
-        set(ONE_VALUE_ARGS
-                OUTPUT_VARIABLE)
-        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
-
-        if (WIN32)
-                set(PING_COMMAND ping 8.8.8.8 -n 2)
-        else ()
-                set(PING_COMMAND ping 8.8.8.8 -c 2)
-        endif ()
-
-        execute_process(
-                COMMAND ${PING_COMMAND}
-                OUTPUT_QUIET
-                ERROR_QUIET
-                RESULT_VARIABLE DISCONNECTED)
-
-        if (NOT DISCONNECTED GREATER 0)
-                set(${ARGS_OUTPUT_VARIABLE} ON PARENT_SCOPE)
-        else ()
-                set(${ARGS_OUTPUT_VARIABLE} OFF PARENT_SCOPE)
-        endif ()
-endfunction ()
-
 function (_validate_args)
         set(ONE_VALUE_ARGS
                 URL
@@ -106,6 +82,7 @@ function (_get_latest_tag)
                 GIT_REPOSITORY
                 LIBRARY_NAME
                 CLEAR
+                BRANCH
                 OUTPUT_VARIABLE)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
@@ -131,6 +108,8 @@ function (_get_latest_tag)
                 --quiet)
         set(GIT_PULL_COMMAND git pull
                 --quiet)
+        set(GIT_COMMIT_COMMAND git log -n 1 "${ARGS_BRANCH}"
+                --pretty=format:"%H")
         set(GIT_SORT_COMMAND git for-each-ref
                 --sort=-creatordate
                 --format "%(refname:short)"
@@ -160,6 +139,20 @@ function (_get_latest_tag)
                         ERROR_QUIET)
         endif ()
 
+        if (ARGS_BRANCH)
+                execute_process(COMMAND ${GIT_COMMIT_COMMAND}
+                        WORKING_DIRECTORY ${CACHE_DIR}
+                        OUTPUT_VARIABLE COMMIT_HASH
+                        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+                if (ARGS_CLEAR)
+                        file(REMOVE_RECURSE ${CACHE_DIR})
+                endif ()
+
+                set(${ARGS_OUTPUT_VARIABLE} ${COMMIT_HASH} PARENT_SCOPE)
+                return()
+        endif ()
+
         # Sort tags by creation date
         execute_process(
                 COMMAND ${GIT_SORT_COMMAND}
@@ -167,12 +160,10 @@ function (_get_latest_tag)
                 OUTPUT_VARIABLE TAG_LIST
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-        # Delete downloaded content
         if (ARGS_CLEAR)
                 file(REMOVE_RECURSE ${CACHE_DIR})
         endif ()
 
-        # Checking if tag list was obtained correctly
         if (NOT TAG_LIST)
                 message(FATAL_ERROR "Failed to obtain tag list.")
         endif ()
@@ -183,6 +174,59 @@ function (_get_latest_tag)
 
         set(${ARGS_OUTPUT_VARIABLE} ${TAG_NAME} PARENT_SCOPE)
 endfunction ()
+
+function(_clear_if_necessary)
+        set(ONE_VALUE_ARGS
+                LIBRARY_NAME
+                LIBRARY_DIR
+                VERSION
+                BRANCH
+                OUTPUT_SHOULD_SKIP_DOWNLOAD)
+        cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
+
+        set(VERSION_CACHE_VARIABLE_NAME "GetProject_${ARGS_LIBRARY_NAME}_VERSION")
+
+        set(EXISTENT_VERSION "${${VERSION_CACHE_VARIABLE_NAME}}")
+        set(NEW_VERSION "${ARGS_VERSION}")
+
+        # If the variable is not present, assume outdated.
+        if (NOT DEFINED ${VERSION_CACHE_VARIABLE_NAME})
+                set(${OUTPUT_SHOULD_SKIP_DOWNLOAD} OFF PARENT_SCOPE)
+                if (EXISTS ${ARGS_LIBRARY_DIR})
+                        file(REMOVE_RECURSE ${ARGS_LIBRARY_DIR})
+                endif ()
+        elseif (ARGS_BRANCH)
+                # Branches do not have versions, so we clear if the commit hash
+                # differs.
+                if (${NEW_VERSION} STREQUAL ${EXISTENT_VERSION})
+                        return()
+                endif ()
+
+                set(${OUTPUT_SHOULD_SKIP_DOWNLOAD} OFF PARENT_SCOPE)
+                if (EXISTS ${ARGS_LIBRARY_DIR})
+                        file(REMOVE_RECURSE ${ARGS_LIBRARY_DIR})
+                endif ()
+        else ()
+                _check_version_collisions(
+                        EXISTENT_VERSION ${EXISTENT_VERSION}
+                        NEW_VERSION ${NEW_VERSION}
+                        OUTPUT_SHOULD_CLEAR SHOULD_CLEAR
+                        OUTPUT_SHOULD_SKIP_DOWNLOAD SHOULD_SKIP_DOWNLOAD)
+
+                _is_directory_empty(
+                        LIBRARY_DIR ${ARGS_LIBRARY_DIR}
+                        OUTPUT_VARIABLE LIBRARY_DIR_EMPTY)
+
+                if (SHOULD_CLEAR OR LIBRARY_DIR_EMPTY)
+                        set(${OUTPUT_SHOULD_SKIP_DOWNLOAD} OFF PARENT_SCOPE)
+                        if (EXISTS ${ARGS_LIBRARY_DIR})
+                                file(REMOVE_RECURSE ${ARGS_LIBRARY_DIR})
+                        endif ()
+                endif ()
+        endif ()
+
+        set(${VERSION_CACHE_VARIABLE_NAME} ${ARGS_VERSION} CACHE STRING "${ARGS_LIBRARY_NAME} version" FORCE)
+endfunction()
 
 function (_download_file)
         set(ONE_VALUE_ARGS
@@ -288,9 +332,9 @@ function (_check_version_collisions)
 
         set(REGEX_VERSION "^v?(([0-9]+)(\\.([0-9]+))?(\\.([0-9]+))?)(-[a-zA-Z_0-9]+)?$")
         if (NOT ${NEW_VERSION} MATCHES ${REGEX_VERSION})
-                message(WARNING "Invalid version format from the tag '${NEW_VERSION}'.")
+                message(WARNING "Could not get version from the tag '${NEW_VERSION}'.")
                 set(${OUTPUT_SHOULD_CLEAR} ON PARENT_SCOPE)
-                return ()
+                return()
         endif ()
 
         string(REGEX MATCH ${REGEX_VERSION} MATCH ${ARGS_EXISTENT_VERSION})
@@ -309,7 +353,7 @@ function (_check_version_collisions)
 
         if (${EXISTENT_VERSION} VERSION_EQUAL ${NEW_VERSION})
                 set(${ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD} ON PARENT_SCOPE)
-                return ()
+                return()
         endif ()
 
         if (${EXISTENT_VERSION} VERSION_GREATER ${NEW_VERSION})
@@ -402,7 +446,9 @@ function (_download_library_url)
 endfunction ()
 
 function (_validate_git_repo)
-        set(ONE_VALUE_ARGS GIT_REPOSITORY)
+        set(ONE_VALUE_ARGS
+                GIT_REPOSITORY
+                OUTPUT_VALID)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
         if (NOT ARGS_GIT_REPOSITORY)
@@ -420,8 +466,9 @@ function (_validate_git_repo)
                 ERROR_QUIET)
 
         if(NOT GIT_CHECK_RESULT EQUAL 0)
-                message(FATAL_ERROR "Invalid or inaccessible git repository "
-                        "'${ARGS_GIT_REPOSITORY}'.")
+                set(${ARGS_OUTPUT_VALID} OFF PARENT_SCOPE)
+        else ()
+                set(${ARGS_OUTPUT_VALID} ON PARENT_SCOPE)
         endif()
 endfunction ()
 
@@ -457,23 +504,11 @@ function (_download_library_git)
                 -c advice.detachedHead=false
                 --quiet
                 ${ARGS_LIBRARY_DIR})
-        set(GIT_PULL_COMMAND ${GIT_EXECUTABLE} pull ${ARGS_GIT_REPOSITORY}
-                --quiet)
 
-        if (EXISTS ${ARGS_LIBRARY_DIR})
-                if (ARGS_BRANCH AND ARGS_KEEP_UPDATED)
-                        execute_process(
-                                COMMAND ${GIT_PULL_COMMAND}
-                                WORKING_DIRECTORY ${ARGS_LIBRARY_DIR}
-                                OUTPUT_QUIET
-                                ERROR_QUIET)
-                endif()
-        else ()
-                execute_process(
-                        COMMAND ${GIT_CLONE_COMMAND}
-                        OUTPUT_QUIET
-                        ERROR_QUIET)
-        endif ()
+        execute_process(
+                COMMAND ${GIT_CLONE_COMMAND}
+                OUTPUT_QUIET
+                ERROR_QUIET)
 endfunction ()
 
 function (_add_subdirectory)
@@ -504,7 +539,7 @@ function (_add_subdirectory)
                 message(WARNING "CMakeLists.txt file not found in library "
                                 "'${ARGS_LIBRARY_NAME}'. Not adding as a "
                                 "subdirectory.")
-                return ()
+                return()
         endif ()
 
         # Define variables for external use.
@@ -599,9 +634,6 @@ function (get_project)
 
         _validate_args(${ARGV})
 
-        _check_internet_connection(
-                OUTPUT_VARIABLE IS_CONNECTED)
-
         if (ARGS_FILE)
                 set(ARGS_DOWNLOAD_ONLY ON)
         endif ()
@@ -610,8 +642,27 @@ function (get_project)
         if (ARGS_GIT_REPOSITORY)
                 # If connected to the internet validate the git repository
                 # without cloning
-                if (IS_CONNECTED)
-                        _validate_git_repo(GIT_REPOSITORY ${ARGS_GIT_REPOSITORY})
+                _validate_git_repo(
+                        GIT_REPOSITORY ${ARGS_GIT_REPOSITORY}
+                        OUTPUT_VALID REPO_VALID)
+
+                if (NOT REPO_VALID)
+                        message(WARNING "Invalid or inaccessible git repository "
+                                "'${ARGS_GIT_REPOSITORY}'. Not downloading.")
+
+                        # Even if the repo is invalid, if the directory already
+                        # exists, add it.
+                        if (NOT ARGS_DOWNLOAD_ONLY)
+                                _add_subdirectory(
+                                        LIBRARY_NAME ${ARGS_LIBRARY_NAME}
+                                        INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
+                                        OPTIONS ${ARGS_OPTIONS})
+
+                                set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
+                                set(${ARGS_LIBRARY_NAME}_ADDED ON PARENT_SCOPE)
+                        endif ()
+
+                        return()
                 endif ()
 
                 # Extract the library name from the GIT_REPOSITORY parameter and
@@ -625,68 +676,28 @@ function (get_project)
         # Directories and files
         set(LIBRARY_DIR "$ENV{GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
 
-        if (NOT IS_CONNECTED)
-                message(STATUS "GetProject: Adding '${ARGS_LIBRARY_NAME}'. Since "
-                               "no internet connection has been detected, nothing "
-                               "can be downloaded.")
-
-                if (EXISTS ${LIBRARY_DIR})
-                        if (NOT ARGS_DOWNLOAD_ONLY)
-                                _add_subdirectory(
-                                        LIBRARY_NAME ${ARGS_LIBRARY_NAME}
-                                        INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
-                                        OPTIONS ${ARGS_OPTIONS})
-                                set(${ARGS_LIBRARY_NAME}_ADDED ON PARENT_SCOPE)
-                        endif ()
-
-                        set(${ARGS_LIBRARY_NAME}_DOWNLOADED ON PARENT_SCOPE)
-                        set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
-                endif ()
-
-                return ()
-        endif ()
-
-        if (ARGS_GIT_REPOSITORY AND NOT ARGS_BRANCH)
-                # Check if the given version is set as null or latest, if so
-                # fetch the latest release.
+        if (ARGS_GIT_REPOSITORY)
+                # Check if the given version is set as null or latest, if
+                # so fetch the latest release.
                 string(TOUPPER "${ARGS_VERSION}" CAPS_VERSION)
-                if (NOT ARGS_VERSION OR "${CAPS_VERSION}" STREQUAL "LATEST")
+                if (ARGS_BRANCH OR NOT ARGS_VERSION OR "${CAPS_VERSION}" STREQUAL "LATEST")
                         _get_latest_tag(
                                 GIT_REPOSITORY ${ARGS_GIT_REPOSITORY}
                                 LIBRARY_NAME ${ARGS_LIBRARY_NAME}
                                 CLEAR OFF
+                                BRANCH ${ARGS_BRANCH}
                                 OUTPUT_VARIABLE ARGS_VERSION)
                 endif ()
         endif ()
 
         message(STATUS "GetProject: Adding '${ARGS_LIBRARY_NAME}'.")
 
-        if (ARGS_GIT_REPOSITORY AND NOT ARGS_BRANCH)
-                # Save the library version.
-                set(VERSION_CACHE_VARIABLE_NAME "GetProject_${ARGS_LIBRARY_NAME}_VERSION")
-                if (DEFINED ${VERSION_CACHE_VARIABLE_NAME})
-                        set(EXISTENT_VERSION "${${VERSION_CACHE_VARIABLE_NAME}}")
-                        set(NEW_VERSION "${ARGS_VERSION}")
-
-                        _check_version_collisions(
-                                EXISTENT_VERSION ${EXISTENT_VERSION}
-                                NEW_VERSION ${NEW_VERSION}
-                                OUTPUT_SHOULD_CLEAR SHOULD_CLEAR
-                                OUTPUT_SHOULD_SKIP_DOWNLOAD SHOULD_SKIP_DOWNLOAD)
-
-                        _is_directory_empty(
-                                LIBRARY_DIR ${LIBRARY_DIR}
-                                OUTPUT_VARIABLE LIBRARY_DIR_EMPTY)
-
-                        if (SHOULD_CLEAR OR LIBRARY_DIR_EMPTY)
-                                set(SHOULD_SKIP_DOWNLOAD OFF)
-                                if (EXISTS ${LIBRARY_DIR})
-                                        file(REMOVE_RECURSE ${LIBRARY_DIR})
-                                endif ()
-                        endif ()
-                endif ()
-
-                set(${VERSION_CACHE_VARIABLE_NAME} ${ARGS_VERSION} CACHE STRING "${ARGS_LIBRARY_NAME} version" FORCE)
+        if (ARGS_GIT_REPOSITORY)
+                _clear_if_necessary(
+                        LIBRARY_NAME ${ARGS_LIBRARY_NAME}
+                        LIBRARY_DIR ${LIBRARY_DIR}
+                        VERSION ${ARGS_VERSION}
+                        BRANCH ${ARGS_BRANCH})
         endif ()
 
         if (ARGS_FILE)
@@ -716,7 +727,7 @@ function (get_project)
         set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
 
         if (ARGS_DOWNLOAD_ONLY)
-                return ()
+                return()
         endif ()
 
         _add_subdirectory(
