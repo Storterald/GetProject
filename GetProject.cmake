@@ -351,12 +351,12 @@ function (_check_version_collisions)
         set(NEW_MINOR ${CMAKE_MATCH_4})
         set(NEW_PATCH ${CMAKE_MATCH_6})
 
-        if (${EXISTENT_VERSION} VERSION_EQUAL ${NEW_VERSION})
+        if ("${EXISTENT_VERSION}" VERSION_EQUAL "${NEW_VERSION}")
                 set(${ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD} ON PARENT_SCOPE)
                 return()
         endif ()
 
-        if (${EXISTENT_VERSION} VERSION_GREATER ${NEW_VERSION})
+        if ("${EXISTENT_VERSION}" VERSION_GREATER "${NEW_VERSION}")
                 if (NOT "${PREVIOUS_MAJOR}" STREQUAL "${CURRENT_MAJOR}")
                         message(WARNING "${ARGS_LIBRARY_NAME} requires the "
                                         "version '${NEW_VERSION_FULL}', which is "
