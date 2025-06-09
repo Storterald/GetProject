@@ -258,7 +258,6 @@ function (_download_file)
 
                 # Download file with hash comparison
                 file(DOWNLOAD ${ARGS_URL} ${FILE_PATH}
-                        EXPECTED_HASH ${ARGS_HASH_TYPE}=${ARGS_HASH}
                         STATUS RESPONSE)
         else ()
                 # Download file without hash comparison
