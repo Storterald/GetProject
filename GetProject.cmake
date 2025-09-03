@@ -623,12 +623,12 @@ function (_add_subdirectory)
                         -DCMAKE_INSTALL_PREFIX:PATH=${LIBRARY_DIR}
                         ${DEFINITIONS})
 
-                set(BUILD_COMMAND --build ${LIBRARY_DIR})
+                set(BUILD_COMMAND --build .)
                 if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "")
                         set(BUILD_COMMAND ${BUILD_COMMAND} --config "${CMAKE_BUILD_TYPE}")
                 endif ()
 
-                set(INSTALL_COMMAND --build ${LIBRARY_DIR} --target install)
+                set(INSTALL_COMMAND --build . --target install)
                 if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "")
                         set(INSTALL_COMMAND ${INSTALL_COMMAND} --config "${CMAKE_BUILD_TYPE}")
                 endif ()
