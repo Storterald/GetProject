@@ -610,7 +610,7 @@ function (_add_subdirectory)
         # TODO find something better
         if (ARGS_INSTALL_ENABLED)
                 message(STATUS "GetProject: Installing ${ARGS_LIBRARY_NAME}...")
-                set(BUILD_DIR "${LIBRARY_DIR}/build/")
+                set(BUILD_DIR "${INTERNAL_LIBRARY_DIR}/build/")
 
                 foreach (OPTION IN LISTS ARGS_OPTIONS)
                         list(APPEND DEFINITIONS "-D${OPTION}")
@@ -623,12 +623,12 @@ function (_add_subdirectory)
                         -DCMAKE_INSTALL_PREFIX:PATH=${LIBRARY_DIR}
                         ${DEFINITIONS})
 
-                set(BUILD_COMMAND --build ${BUILD_DIR})
+                set(BUILD_COMMAND --build ${LIBRARY_DIR})
                 if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "")
                         set(BUILD_COMMAND ${BUILD_COMMAND} --config "${CMAKE_BUILD_TYPE}")
                 endif ()
 
-                set(INSTALL_COMMAND --build ${BUILD_DIR} --target install)
+                set(INSTALL_COMMAND --build ${LIBRARY_DIR} --target install)
                 if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "")
                         set(INSTALL_COMMAND ${INSTALL_COMMAND} --config "${CMAKE_BUILD_TYPE}")
                 endif ()
@@ -645,7 +645,6 @@ function (_add_subdirectory)
                         OUTPUT_QUIET
                         WORKING_DIRECTORY ${LIBRARY_DIR})
 
-                file(REMOVE_RECURSE ${BUILD_DIR})
                 message(STATUS "GetProject: ${ARGS_LIBRARY_NAME} installed.")
         endif ()
 endfunction ()
