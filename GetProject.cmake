@@ -94,19 +94,16 @@ function (_get_latest_tag)
 
         # Directories
         set(INTERNAL_LIBRARY_DIR "$ENV{INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
-        set(CACHE_DIR "${INTERNAL_LIBRARY_DIR}/get_latest_tag")
+        set(CACHE_DIR            "${INTERNAL_LIBRARY_DIR}/get_latest_tag")
+        set(GIT_DIR              "${CACHE_DIR}/.git")
 
         # Commands
         set(GIT_CLONE_COMMAND git clone ${ARGS_GIT_REPOSITORY}
-                --depth 1
                 --no-checkout
                 --quiet
                 ${CACHE_DIR})
         set(GIT_FETCH_COMMAND git fetch
                 --tags
-                --depth 1
-                --quiet)
-        set(GIT_PULL_COMMAND git pull
                 --quiet)
         set(GIT_COMMIT_COMMAND git log -n 1 "${ARGS_BRANCH}"
                 --pretty=format:"%H")
@@ -128,20 +125,16 @@ function (_get_latest_tag)
                 execute_process(COMMAND ${GIT_CLONE_COMMAND}
                         OUTPUT_QUIET
                         ERROR_QUIET)
-                execute_process(COMMAND ${GIT_FETCH_COMMAND}
-                        WORKING_DIRECTORY ${CACHE_DIR}
-                        OUTPUT_QUIET
-                        ERROR_QUIET)
-        else ()
-                execute_process(COMMAND ${GIT_PULL_COMMAND}
-                        WORKING_DIRECTORY ${CACHE_DIR}
-                        OUTPUT_QUIET
-                        ERROR_QUIET)
         endif ()
+
+        execute_process(COMMAND ${GIT_FETCH_COMMAND}
+                WORKING_DIRECTORY ${GIT_DIR}
+                OUTPUT_QUIET
+                ERROR_QUIET)
 
         if (ARGS_BRANCH)
                 execute_process(COMMAND ${GIT_COMMIT_COMMAND}
-                        WORKING_DIRECTORY ${CACHE_DIR}
+                        WORKING_DIRECTORY ${GIT_DIR}
                         OUTPUT_VARIABLE COMMIT_HASH
                         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
@@ -156,8 +149,7 @@ function (_get_latest_tag)
         # Sort tags by creation date
         execute_process(
                 COMMAND ${GIT_SORT_COMMAND}
-                WORKING_DIRECTORY ${CACHE_DIR}
-                RESULT_VARIABLE AA
+                WORKING_DIRECTORY ${GIT_DIR}
                 OUTPUT_VARIABLE TAG_LIST
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
@@ -216,6 +208,7 @@ function (_clear_if_necessary)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
         set(VERSION_CACHE_VARIABLE_NAME "GetProject_${ARGS_LIBRARY_NAME}_VERSION")
+        set(${OUTPUT_SHOULD_SKIP_DOWNLOAD} ON PARENT_SCOPE)
 
         # If the variable is not present, check if the library dir exists. If so
         # check the version, it may have been externally downloaded or by another
@@ -239,7 +232,7 @@ function (_clear_if_necessary)
         # The above code did not find any version or for some reason the version
         # was saved as empty.
         if ("${EXISTENT_VERSION}" STREQUAL "")
-                set(${OUTPUT_SHOULD_SKIP_DOWNLOAD} OFF PARENT_SCOPE)
+                set(${ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD} OFF PARENT_SCOPE)
                 if (EXISTS ${ARGS_LIBRARY_DIR})
                         file(REMOVE_RECURSE ${ARGS_LIBRARY_DIR})
                 endif ()
@@ -250,7 +243,7 @@ function (_clear_if_necessary)
                         return()
                 endif ()
 
-                set(${OUTPUT_SHOULD_SKIP_DOWNLOAD} OFF PARENT_SCOPE)
+                set(${ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD} OFF PARENT_SCOPE)
                 if (EXISTS ${ARGS_LIBRARY_DIR})
                         file(REMOVE_RECURSE ${ARGS_LIBRARY_DIR})
                 endif ()
@@ -266,7 +259,7 @@ function (_clear_if_necessary)
                         OUTPUT_VARIABLE LIBRARY_DIR_EMPTY)
 
                 if (SHOULD_CLEAR OR LIBRARY_DIR_EMPTY)
-                        set(${OUTPUT_SHOULD_SKIP_DOWNLOAD} OFF PARENT_SCOPE)
+                        set(${ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD} OFF PARENT_SCOPE)
                         if (EXISTS ${ARGS_LIBRARY_DIR})
                                 file(REMOVE_RECURSE ${ARGS_LIBRARY_DIR})
                         endif ()
@@ -623,12 +616,12 @@ function (_add_subdirectory)
                         -DCMAKE_INSTALL_PREFIX:PATH=${LIBRARY_DIR}
                         ${DEFINITIONS})
 
-                set(BUILD_COMMAND --build .)
+                set(BUILD_COMMAND --build ${BUILD_DIR})
                 if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "")
                         set(BUILD_COMMAND ${BUILD_COMMAND} --config "${CMAKE_BUILD_TYPE}")
                 endif ()
 
-                set(INSTALL_COMMAND --build . --target install)
+                set(INSTALL_COMMAND --build ${BUILD_DIR} --target install)
                 if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "")
                         set(INSTALL_COMMAND ${INSTALL_COMMAND} --config "${CMAKE_BUILD_TYPE}")
                 endif ()
@@ -743,7 +736,8 @@ function (get_project)
                         LIBRARY_NAME ${ARGS_LIBRARY_NAME}
                         LIBRARY_DIR ${LIBRARY_DIR}
                         VERSION ${ARGS_VERSION}
-                        BRANCH ${ARGS_BRANCH})
+                        BRANCH ${ARGS_BRANCH}
+                        OUTPUT_SHOULD_SKIP_DOWNLOAD SHOULD_SKIP_DOWNLOAD)
         endif ()
 
         if (ARGS_FILE)
