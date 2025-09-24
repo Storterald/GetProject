@@ -100,13 +100,19 @@ function (_get_latest_tag)
         # Commands
         set(GIT_CLONE_COMMAND git clone ${ARGS_GIT_REPOSITORY}
                 --no-checkout
+                --depth=1
                 --quiet
                 ${CACHE_DIR})
-        set(GIT_FETCH_COMMAND git fetch
+        set(GIT_FETCH_TAGS git fetch
                 --tags
+                --depth=1
                 --quiet)
-        set(GIT_COMMIT_COMMAND git log -n 1 "${ARGS_BRANCH}"
-                --pretty=format:"%H")
+        set(GIT_FETCH_COMMITS git fetch
+                --depth=1
+                origin ${ARGS_BRANCH}
+                --quiet)
+        set(GIT_COMMIT_COMMAND git rev-parse
+                origin/${ARGS_BRANCH})
         set(GIT_SORT_COMMAND git for-each-ref
                 --sort=-creatordate
                 --format "%(refname:short)"
@@ -127,12 +133,16 @@ function (_get_latest_tag)
                         ERROR_QUIET)
         endif ()
 
-        execute_process(COMMAND ${GIT_FETCH_COMMAND}
+        execute_process(COMMAND ${GIT_FETCH_TAGS}
                 WORKING_DIRECTORY ${GIT_DIR}
                 OUTPUT_QUIET
                 ERROR_QUIET)
 
         if (ARGS_BRANCH)
+                execute_process(COMMAND ${GIT_FETCH_COMMITS}
+                        WORKING_DIRECTORY ${GIT_DIR}
+                        OUTPUT_QUIET
+                        ERROR_QUIET)
                 execute_process(COMMAND ${GIT_COMMIT_COMMAND}
                         WORKING_DIRECTORY ${GIT_DIR}
                         OUTPUT_VARIABLE COMMIT_HASH
