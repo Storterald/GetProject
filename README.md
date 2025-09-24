@@ -1,15 +1,5 @@
-# DO NOT USE
-
-This code is still in `BETA` and will **likely not work** when used. This is
+This code is still in `BETA` and **may not work** when used. This is
 just a side project that exists just because I hate `FetchContent` and `ExternalProject`.
-
-### Known Issues
-
- - **Install step** is now extremely **slow**, as it requires the library to be
-   *configured* and *built*.
- - **common output dir** all dependencies from all levels should be in the same dir, already
-   technically implemented, but an environment variable should be used.
- - **No package version checks** there are currently no checks for versions mismatches / incompatibilities
 
 # CMake GetProject
 
@@ -28,15 +18,16 @@ The output will be placed in `${GET_PROJECT_OUTPUT_DIR}/${LIBRARY_NAME}`.
 
 ```cmake
 get_project(
-        DOWNLOAD_ONLY           # If ON the library won't be added as a sub directory
-        INSTALL_ENABLED         # If the install target needs to be built
-        URL                     # Library URL
-        LIBRARY_NAME            # Library name
-        GIT_REPOSITORY          # Library git repository
-        BRANCH                  # Library git branch
-        KEEP_UPDATED            # If the library should be kept updated
-        VERSION                 # A valid tag or LATEST for the latest release
-        OPTIONS                 # Options that will be defined before adding the sub directory.
+        URL                    # Library URL
+        GIT_REPOSITORY         # Library git repository
+        FILE                   # If ARGS_URL downloads a single file
+        LIBRARY_NAME           # Library name (can be inferred from git repo)
+        INSTALL_ENABLED        # If the library needs to be installed (requires extra build)
+        DOWNLOAD_ONLY          # If ON the library won't be added as a sub directory
+        BRANCH                 # Library git branch
+        KEEP_UPDATED           # If the library should be kept updated
+        VERSION                # A valid tag or LATEST for the latest release
+        OPTIONS                # Options that will be defined before adding the sub directory.
 )
 ```
 
@@ -46,45 +37,7 @@ time**.
 
 ## Usage
 
-**Downloads** the project from a **URL** and **builds** and **installs** it.
-The library will be placed in `${DIRECTORY}/${LIBRARY_NAME}`.
+The `URL`, `GIT_REPOSITORY` arguments are **mutually exclusive**.
 
-```cmake
-get_project(
-        INSTALL_ENABLED ON
-        URL "https://github.com/torvalds/linux/archive/refs/tags/v6.12.zip"
-        LIBRARY_NAME "linux-kernel"
-        OPTIONS
-                CMAKE_VERBOSE_MAKEFILE=ON
-)
-```
-
-**Downloads** the library from a **git repository** and a **branch** keeping
-the library **updated** but without performing the install step.
-
-```cmake
-get_project(
-        DOWNLOAD_ONLY ON
-        GIT_REPOSITORY "https://github.com/torvalds/linux.git"
-        BRANCH "master"
-        KEEP_UPDATED ON
-)
-```
-
-**Downloads** and **builds** the library from a **git repository** and a **version**.
-
-```cmake
-get_project(
-        GIT_REPOSITORY "https://github.com/torvalds/linux.git"
-        VERSION "v6.3-rc1"
-)
-```
-
-**Downloads** and **builds** the **latest** version of the library from a **git repository**.
-
-```cmake
-get_project(
-        GIT_REPOSITORY "https://github.com/torvalds/linux.git"
-        VERSION LATEST
-)
-```
+The `BRANCH` arguments may be used with the `KEEP_UPDATED` option, `VERSION` is
+used when **no branch** is provided. 

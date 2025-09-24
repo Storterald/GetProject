@@ -38,42 +38,48 @@ function (_validate_args)
                 OPTIONS)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
-        if (ARGS_URL AND NOT ARGS_LIBRARY_NAME)
-                message(FATAL_ERROR "LIBRARY_NAME is required when passing an URL.")
+        if (NOT ARGS_URL AND NOT ARGS_GIT_REPOSITORY)
+                message(FATAL_ERROR "Either an URL or a GIT_REPOSITORY is required "
+                                    "for get_project to do something.")
         endif ()
 
-        if (NOT ARGS_URL AND NOT ARGS_GIT_REPOSITORY)
-                message(FATAL_ERROR "Either URL or GIT_REPOSITORY is required "
-                        "for get_project to do something.")
+        if (ARGS_GIT_REPOSITORY AND ARGS_URL)
+                message(FATAL_ERROR "Only one of GIT_REPOSITORY, ARGS_URL and "
+                                    "must be set.")
+        endif ()
+
+        if (ARGS_URL AND NOT ARGS_LIBRARY_NAME)
+                message(FATAL_ERROR "LIBRARY_NAME is required when not passing a "
+                                    "git repository.")
         endif ()
 
         if (ARGS_FILE AND NOT ARGS_URL)
                 message(FATAL_ERROR "FILE boolean argument must be used along URL")
         endif ()
 
-        if (NOT ARGS_BRANCH AND NOT "${ARGS_KEEP_UPDATED}" STREQUAL "")
+        if (NOT ARGS_BRANCH AND ARGS_KEEP_UPDATED)
                 message(WARNING "KEEP_UPDATED argument is only used when the "
-                        "BRANCH argument is passed.")
+                                "BRANCH argument is passed.")
         endif ()
 
         if (ARGS_BRANCH AND ARGS_VERSION)
                 message(WARNING "VERSION argument is only used when downloading "
-                        "a release, not a specific branch.")
+                                "a release, not a specific branch.")
         endif ()
 
         if (ARGS_DOWNLOAD_ONLY AND ARGS_OPTIONS)
                 message(WARNING "OPTIONS argument is only used when the DOWNLOAD_ONLY "
-                        "argument is set to OFF.")
+                                "argument is set to OFF.")
         endif ()
 
         if (ARGS_GIT_REPOSITORY AND NOT ARGS_BRANCH AND NOT ARGS_VERSION)
                 message(WARNING "VERSION and BRANCH argument is missing, downloading "
-                        "latest public release...")
+                                "latest public release...")
         endif ()
 
         if (ARGS_FILE AND ARGS_INSTALL_ENABLED)
                 message(WARNING "INSTALL_ENABLED argument is only used when the FILE "
-                        "argument is set to OFF.")
+                                "argument is set to OFF.")
         endif ()
 endfunction ()
 
@@ -86,10 +92,10 @@ function (_get_latest_tag)
                 OUTPUT_VARIABLE)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_GIT_REPOSITORY OR NOT ARGS_LIBRARY_NAME)
+        if (NOT ARGS_GIT_REPOSITORY OR NOT ARGS_LIBRARY_NAME OR NOT OUTPUT_VARIABLE)
                 message(FATAL_ERROR "Missing parameters in function call to "
-                        "_get_latest_tag, please report this at "
-                        "https://github.com/Storterald/GetProject/issues.")
+                                    "_get_latest_tag, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Directories
@@ -186,12 +192,18 @@ function (_get_current_version)
                 OUTPUT_VARIABLE)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
+        if (NOT ARGS_DIRECTORY OR NOT ARGS_OUTPUT_FOUND OR NOT ARGS_OUTPUT_VARIABLE)
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_get_current_version, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
+        endif ()
+
         set(${OUTPUT_FOUND} OFF PARENT_SCOPE)
 
         if (NOT ARGS_BRANCH)
                 set(GIT_COMMAND git describe --tags --exact-match)
         else ()
-                set(GIT_COMMAND git rev-parse HEAD)
+                set(GIT_COMMAND git rev-parse origin/${BRANCH})
         endif ()
 
         execute_process(
@@ -217,39 +229,31 @@ function (_clear_if_necessary)
                 OUTPUT_SHOULD_SKIP_DOWNLOAD)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        set(VERSION_CACHE_VARIABLE_NAME "GetProject_${ARGS_LIBRARY_NAME}_VERSION")
+        if (NOT ARGS_LIBRARY_NAME OR NOT ARGS_LIBRARY_DIR OR NOT ARGS_VERSION OR NOT ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD)
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_clear_if_necessary, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
+        endif ()
+
         set(${OUTPUT_SHOULD_SKIP_DOWNLOAD} ON PARENT_SCOPE)
 
-        # If the variable is not present, check if the library dir exists. If so
-        # check the version, it may have been externally downloaded or by another
-        # CMake configuration with a different build directory.
-        if (NOT DEFINED ${VERSION_CACHE_VARIABLE_NAME} AND EXISTS ${ARGS_LIBRARY_DIR})
+        if (EXISTS ${ARGS_LIBRARY_DIR})
                 _get_current_version(
                         BRANCH ${ARGS_BRANCH}
                         DIRECTORY ${ARGS_LIBRARY_DIR}
                         OUTPUT_FOUND VERSION_FOUND
                         OUTPUT_VARIABLE EXISTENT_VERSION)
-
-                if (VERSION_FOUND)
-                        set(${VERSION_CACHE_VARIABLE_NAME} ${EXISTENT_VERSION}
-                                CACHE STRING "${ARGS_LIBRARY_NAME} version" FORCE)
-                endif ()
         endif ()
 
-        set(EXISTENT_VERSION "${${VERSION_CACHE_VARIABLE_NAME}}")
-        set(NEW_VERSION      "${ARGS_VERSION}")
-
-        # The above code did not find any version or for some reason the version
-        # was saved as empty.
         if ("${EXISTENT_VERSION}" STREQUAL "")
                 set(${ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD} OFF PARENT_SCOPE)
                 if (EXISTS ${ARGS_LIBRARY_DIR})
                         file(REMOVE_RECURSE ${ARGS_LIBRARY_DIR})
                 endif ()
         elseif (ARGS_BRANCH)
-                # Branches do not have versions, so we clear if the commit hash
-                # differs.
-                if (${NEW_VERSION} STREQUAL ${EXISTENT_VERSION})
+                # If the BRANCH option is used, then the version is the commit
+                # hash.
+                if (${ARGS_VERSION} STREQUAL ${EXISTENT_VERSION})
                         return()
                 endif ()
 
@@ -260,7 +264,7 @@ function (_clear_if_necessary)
         else ()
                 _check_version_collisions(
                         EXISTENT_VERSION ${EXISTENT_VERSION}
-                        NEW_VERSION ${NEW_VERSION}
+                        NEW_VERSION ${ARGS_VERSION}
                         OUTPUT_SHOULD_CLEAR SHOULD_CLEAR
                         OUTPUT_SHOULD_SKIP_DOWNLOAD SHOULD_SKIP_DOWNLOAD)
 
@@ -275,8 +279,6 @@ function (_clear_if_necessary)
                         endif ()
                 endif ()
         endif ()
-
-        set(${VERSION_CACHE_VARIABLE_NAME} ${ARGS_VERSION} CACHE STRING "${ARGS_LIBRARY_NAME} version" FORCE)
 endfunction ()
 
 function (_download_file)
@@ -290,8 +292,8 @@ function (_download_file)
 
         if (NOT ARGS_URL OR NOT ARGS_DIRECTORY)
                 message(FATAL_ERROR "Missing parameters in function call to "
-                        "_download_file, please report this at "
-                        "https://github.com/Storterald/GetProject/issues.")
+                                    "_download_file, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Get archive name and extension
@@ -303,8 +305,8 @@ function (_download_file)
                 # Check if HASH_TYPE parameter was given
                 if (NOT ARGS_HASH_TYPE)
                         message(FATAL_ERROR "HASH_TYPE must be provided when "
-                                "passing HASH parameter to "
-                                "download_file_from_url.")
+                                            "passing HASH parameter to "
+                                            "download_file_from_url.")
                 endif ()
 
                 # Download file with hash comparison
@@ -319,7 +321,7 @@ function (_download_file)
         # Check if response is good
         if (NOT RESPONSE EQUAL 0)
                 message(FATAL_ERROR "Failed to download file '${FILE_NAME}', "
-                        "response: '${RESPONSE}'.")
+                                    "response: '${RESPONSE}'.")
         endif()
 
         file(MD5 ${FILE_PATH} NEW_HASH)
@@ -330,6 +332,12 @@ function (_extract_archive)
         set(ONE_VALUE_ARGS
                 LIBRARY_NAME)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
+
+        if (NOT ARGS_LIBRARY_NAME)
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_extract_archive, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
+        endif ()
 
         # Directories and files
         set(INTERNAL_LIBRARY_DIR "$ENV{INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
@@ -356,8 +364,8 @@ function (_is_directory_empty)
 
         if (NOT ARGS_LIBRARY_DIR OR NOT ARGS_OUTPUT_VARIABLE)
                 message(FATAL_ERROR "Missing parameters in function call to "
-                        "_is_directory_empty, please report this at "
-                        "https://github.com/Storterald/GetProject/issues.")
+                                    "_is_directory_empty, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Used to check if directory is empty
@@ -379,6 +387,12 @@ function (_check_version_collisions)
                 OUTPUT_SHOULD_CLEAR
                 OUTPUT_SHOULD_SKIP_DOWNLOAD)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
+
+        if (NOT ARGS_EXISTENT_VERSION OR NOT ARGS_NEW_VERSION OR NOT ARGS_OUTPUT_SHOULD_CLEAR OR NOT ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD)
+                message(FATAL_ERROR "Missing parameters in function call to "
+                                    "_check_version_collisions, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
+        endif ()
 
         set(REGEX_VERSION "^v?(([0-9]+)(\\.([0-9]+))?(\\.([0-9]+))?)(-[a-zA-Z_0-9]+)?$")
         if (NOT ${NEW_VERSION} MATCHES ${REGEX_VERSION})
@@ -409,10 +423,10 @@ function (_check_version_collisions)
         if ("${EXISTENT_VERSION}" VERSION_GREATER "${NEW_VERSION}")
                 if (NOT "${PREVIOUS_MAJOR}" STREQUAL "${CURRENT_MAJOR}")
                         message(WARNING "${ARGS_LIBRARY_NAME} requires the "
-                                "version '${NEW_VERSION_FULL}', which is "
-                                "older than the currently used one "
-                                "(${EXISTENT_VERSION_FULL}) and is "
-                                "missing a major update.")
+                                        "version '${NEW_VERSION_FULL}', which is "
+                                        "older than the currently used one "
+                                        "(${EXISTENT_VERSION_FULL}) and is "
+                                        "missing a major update.")
                 endif ()
 
                 # If the already present version is greater
@@ -421,10 +435,10 @@ function (_check_version_collisions)
         else ()
                 if (NOT "${PREVIOUS_MAJOR}" STREQUAL "${CURRENT_MAJOR}")
                         message(WARNING "${ARGS_LIBRARY_NAME} requires the "
-                                "version '${NEW_VERSION_FULL}', which is "
-                                "newer than the currently used one "
-                                "(${EXISTENT_VERSION_FULL}), which is "
-                                "missing a major update.")
+                                        "version '${NEW_VERSION_FULL}', which is "
+                                        "newer than the currently used one "
+                                        "(${EXISTENT_VERSION_FULL}), which is "
+                                        "missing a major update.")
                 endif ()
 
                 set(${ARGS_OUTPUT_SHOULD_CLEAR} ON PARENT_SCOPE)
@@ -439,8 +453,8 @@ function (_download_library_url)
 
         if (NOT ARGS_URL OR NOT ARGS_LIBRARY_NAME)
                 message(FATAL_ERROR "Missing parameters in function call to "
-                        "_download_library_url, please report this at "
-                        "https://github.com/Storterald/GetProject/issues.")
+                                    "_download_library_url, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Directories and files
@@ -471,17 +485,17 @@ function (_download_library_url)
 
                 if (NOT LIBRARY_DIR_EMPTY)
                         message(STATUS "Old and new downloaded file hashes match, "
-                                "but '${ARGS_LIBRARY_NAME}' directory does "
-                                "not exist / is empty, extracting...")
+                                       "but '${ARGS_LIBRARY_NAME}' directory does "
+                                       "not exist / is empty, extracting...")
                 else ()
                         message(STATUS "Old and new downloaded file hashes match. "
-                                "Not Extracting.")
+                                       "Not Extracting.")
 
                         return()
                 endif ()
         else ()
                 message(STATUS "Old and new downloaded file hashes don't match, "
-                        "extracting...")
+                               "extracting...")
         endif ()
 
         set(${HASH_VAR_NAME} ${NEW_HASH} CACHE STRING "${ARGS_LIBRARY_NAME} hash" FORCE)
@@ -501,10 +515,10 @@ function (_validate_git_repo)
                 OUTPUT_VALID)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_GIT_REPOSITORY)
+        if (NOT ARGS_GIT_REPOSITORY OR NOT ARGS_OUTPUT_VALID)
                 message(FATAL_ERROR "Missing parameters in function call to "
-                        "_validate_git_repo, please report this at "
-                        "https://github.com/Storterald/GetProject/issues.")
+                                    "_validate_git_repo, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # If connected to the internet validate the git repository
@@ -533,8 +547,8 @@ function (_download_library_git)
 
         if (NOT ARGS_GIT_REPOSITORY OR (NOT ARGS_BRANCH AND NOT ARGS_VERSION) OR NOT ARGS_LIBRARY_DIR)
                 message(FATAL_ERROR "Missing parameters in function call to "
-                        "_download_library_git, please report this at "
-                        "https://github.com/Storterald/GetProject/issues.")
+                                    "_download_library_git, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Save the version or the branch in the COMMAND_BRANCH variable,
@@ -571,8 +585,8 @@ function (_add_subdirectory)
 
         if (NOT ARGS_LIBRARY_NAME)
                 message(FATAL_ERROR "Missing parameters in function call to "
-                        "_add_subdirectory, please report this at "
-                        "https://github.com/Storterald/GetProject/issues.")
+                                    "_add_subdirectory, please report this at "
+                                    "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
         # Directories
@@ -587,8 +601,8 @@ function (_add_subdirectory)
         # be handled by the user.
         if (NOT EXISTS "${LIBRARY_DIR}/CMakeLists.txt")
                 message(WARNING "CMakeLists.txt file not found in library "
-                        "'${ARGS_LIBRARY_NAME}'. Not adding as a "
-                        "subdirectory.")
+                                "'${ARGS_LIBRARY_NAME}'. Not adding as a "
+                                "subdirectory.")
                 return()
         endif ()
 
@@ -600,7 +614,7 @@ function (_add_subdirectory)
         foreach (OPTION IN LISTS ARGS_OPTIONS)
                 if (NOT ${OPTION} MATCHES ${REGEXP})
                         message(FATAL_ERROR "Option '${OPTION}' not recognized. "
-                                "Use the format NAME=VALUE")
+                                            "Use the format NAME=VALUE")
                 endif ()
 
                 string(REGEX MATCH ${REGEXP} OUT ${OPTION})
@@ -675,9 +689,9 @@ function (get_project)
                 find_package(Git)
                 if (NOT GIT_FOUND)
                         message(FATAL_ERROR "Git is required to use GetProject "
-                                "with the GIT_REPOSITORY parameter. "
-                                "You can download git at "
-                                "https://git-scm.com/downloads")
+                                            "with the GIT_REPOSITORY parameter. "
+                                            "You can download git at "
+                                            "https://git-scm.com/downloads")
                 endif ()
         endif ()
 
@@ -697,7 +711,7 @@ function (get_project)
 
                 if (NOT REPO_VALID)
                         message(WARNING "Invalid or inaccessible git repository "
-                                "'${ARGS_GIT_REPOSITORY}'. Not downloading.")
+                                        "'${ARGS_GIT_REPOSITORY}'. Not downloading.")
 
                         # Even if the repo is invalid, if the directory already
                         # exists, add it.
