@@ -92,7 +92,7 @@ function (_get_latest_tag)
                 OUTPUT_VARIABLE)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_GIT_REPOSITORY OR NOT ARGS_LIBRARY_NAME OR NOT OUTPUT_VARIABLE)
+        if (NOT ARGS_GIT_REPOSITORY OR NOT ARGS_LIBRARY_NAME)
                 message(FATAL_ERROR "Missing parameters in function call to "
                                     "_get_latest_tag, please report this at "
                                     "https://github.com/Storterald/GetProject/issues.")
@@ -192,7 +192,7 @@ function (_get_current_version)
                 OUTPUT_VARIABLE)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_DIRECTORY OR NOT ARGS_OUTPUT_FOUND OR NOT ARGS_OUTPUT_VARIABLE)
+        if (NOT ARGS_DIRECTORY OR NOT ARGS_OUTPUT_FOUND)
                 message(FATAL_ERROR "Missing parameters in function call to "
                                     "_get_current_version, please report this at "
                                     "https://github.com/Storterald/GetProject/issues.")
@@ -229,7 +229,7 @@ function (_clear_if_necessary)
                 OUTPUT_SHOULD_SKIP_DOWNLOAD)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_LIBRARY_NAME OR NOT ARGS_LIBRARY_DIR OR NOT ARGS_VERSION OR NOT ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD)
+        if (NOT ARGS_LIBRARY_NAME OR NOT ARGS_LIBRARY_DIR OR NOT ARGS_VERSION)
                 message(FATAL_ERROR "Missing parameters in function call to "
                                     "_clear_if_necessary, please report this at "
                                     "https://github.com/Storterald/GetProject/issues.")
@@ -362,7 +362,7 @@ function (_is_directory_empty)
                 OUTPUT_VARIABLE)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_LIBRARY_DIR OR NOT ARGS_OUTPUT_VARIABLE)
+        if (NOT ARGS_LIBRARY_DIR)
                 message(FATAL_ERROR "Missing parameters in function call to "
                                     "_is_directory_empty, please report this at "
                                     "https://github.com/Storterald/GetProject/issues.")
@@ -388,7 +388,7 @@ function (_check_version_collisions)
                 OUTPUT_SHOULD_SKIP_DOWNLOAD)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_EXISTENT_VERSION OR NOT ARGS_NEW_VERSION OR NOT ARGS_OUTPUT_SHOULD_CLEAR OR NOT ARGS_OUTPUT_SHOULD_SKIP_DOWNLOAD)
+        if (NOT ARGS_EXISTENT_VERSION OR NOT ARGS_NEW_VERSION)
                 message(FATAL_ERROR "Missing parameters in function call to "
                                     "_check_version_collisions, please report this at "
                                     "https://github.com/Storterald/GetProject/issues.")
@@ -515,7 +515,7 @@ function (_validate_git_repo)
                 OUTPUT_VALID)
         cmake_parse_arguments(ARGS "" "${ONE_VALUE_ARGS}" "" ${ARGN})
 
-        if (NOT ARGS_GIT_REPOSITORY OR NOT ARGS_OUTPUT_VALID)
+        if (NOT ARGS_GIT_REPOSITORY)
                 message(FATAL_ERROR "Missing parameters in function call to "
                                     "_validate_git_repo, please report this at "
                                     "https://github.com/Storterald/GetProject/issues.")
