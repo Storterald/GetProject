@@ -203,7 +203,7 @@ function (_get_current_version)
         if (NOT ARGS_BRANCH)
                 set(GIT_COMMAND git describe --tags --exact-match)
         else ()
-                set(GIT_COMMAND git rev-parse origin/${BRANCH})
+                set(GIT_COMMAND git rev-parse origin/${ARGS_BRANCH})
         endif ()
 
         execute_process(
