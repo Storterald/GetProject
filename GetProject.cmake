@@ -789,6 +789,7 @@ function (get_project)
 
         set(${ARGS_LIBRARY_NAME}_DOWNLOADED ON PARENT_SCOPE)
         set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
+        set(${ARGS_LIBRARY_NAME}_VERSION ${ARGS_VERSION} PARENT_SCOPE)
 
         if (ARGS_DOWNLOAD_ONLY)
                 return()
