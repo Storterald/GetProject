@@ -712,19 +712,6 @@ function (get_project)
                 if (NOT REPO_VALID)
                         message(WARNING "Invalid or inaccessible git repository "
                                         "'${ARGS_GIT_REPOSITORY}'. Not downloading.")
-
-                        # Even if the repo is invalid, if the directory already
-                        # exists, add it.
-                        if (NOT ARGS_DOWNLOAD_ONLY)
-                                _add_subdirectory(
-                                        LIBRARY_NAME ${ARGS_LIBRARY_NAME}
-                                        INSTALL_ENABLED ${ARGS_INSTALL_ENABLED}
-                                        OPTIONS ${ARGS_OPTIONS})
-
-                                set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
-                                set(${ARGS_LIBRARY_NAME}_ADDED ON PARENT_SCOPE)
-                        endif ()
-
                         return()
                 endif ()
 
@@ -737,7 +724,8 @@ function (get_project)
         endif ()
 
         # Directories and files
-        set(LIBRARY_DIR "$ENV{GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(LIBRARY_DIR          "$ENV{GET_PROJECT_OUTPUT_DIR}/${ARGS_LIBRARY_NAME}")
+        set(INTERNAL_LIBRARY_DIR "$ENV{INTERNAL_GET_PROJECT_DIR}/${ARGS_LIBRARY_NAME}")
 
         if (ARGS_GIT_REPOSITORY)
                 # Check if the given version is set as null or latest, if
@@ -788,8 +776,9 @@ function (get_project)
         endif ()
 
         set(${ARGS_LIBRARY_NAME}_DOWNLOADED ON PARENT_SCOPE)
-        set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
         set(${ARGS_LIBRARY_NAME}_VERSION ${ARGS_VERSION} PARENT_SCOPE)
+        set(${ARGS_LIBRARY_NAME}_SOURCE ${LIBRARY_DIR} PARENT_SCOPE)
+        set(${ARGS_LIBRARY_NAME}_BINARY ${INTERNAL_LIBRARY_DIR} PARENT_SCOPE)
 
         if (ARGS_DOWNLOAD_ONLY)
                 return()
