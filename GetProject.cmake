@@ -315,10 +315,11 @@ function (_download_file)
         endif ()
 
         if (NOT RESPONSE EQUAL 0)
+                list(GET RESPONSE 0 CODE)
                 list(GET RESPONSE 1 RESPONSE)
                 string(REGEX REPLACE "^\"(.+)\"$" "\n\\1\n" RESPONSE ${RESPONSE})
                 message(FATAL_ERROR "Failed to download file '${FILE_NAME}', "
-                                    "response:${RESPONSE}")
+                                    "response {${CODE}}:${RESPONSE}")
         endif()
 
         file(MD5 ${FILE_PATH} NEW_HASH)
