@@ -296,32 +296,29 @@ function (_download_file)
                                     "https://github.com/Storterald/GetProject/issues.")
         endif ()
 
-        # Get archive name and extension
         get_filename_component(FILE_NAME ${ARGS_URL} NAME)
 
         set(FILE_PATH "${ARGS_DIRECTORY}/${FILE_NAME}")
 
         if (ARGS_HASH)
-                # Check if HASH_TYPE parameter was given
                 if (NOT ARGS_HASH_TYPE)
                         message(FATAL_ERROR "HASH_TYPE must be provided when "
                                             "passing HASH parameter to "
                                             "download_file_from_url.")
                 endif ()
 
-                # Download file with hash comparison
                 file(DOWNLOAD ${ARGS_URL} ${FILE_PATH}
                         STATUS RESPONSE)
         else ()
-                # Download file without hash comparison
                 file(DOWNLOAD ${ARGS_URL} ${FILE_PATH}
                         STATUS RESPONSE)
         endif ()
 
-        # Check if response is good
         if (NOT RESPONSE EQUAL 0)
+                list(GET RESPONSE 1 RESPONSE)
+                string(REGEX REPLACE "^\"(.+)\"$" "\n\\1\n" RESPONSE ${RESPONSE})
                 message(FATAL_ERROR "Failed to download file '${FILE_NAME}', "
-                                    "response: '${RESPONSE}'.")
+                                    "response:${RESPONSE}")
         endif()
 
         file(MD5 ${FILE_PATH} NEW_HASH)
