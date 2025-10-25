@@ -718,7 +718,7 @@ function (get_project)
                 # Extract the library name from the GIT_REPOSITORY parameter and
                 # save it in ARGS_LIBRARY_NAME if the user didn't provide one.
                 if (NOT ARGS_LIBRARY_NAME)
-                        string(REGEX REPLACE ".*/([^/]+)\\.git$" "\\1"
+                        string(REGEX REPLACE ".*/([^/.]+)(\\.git)?$" "\\1"
                                 ARGS_LIBRARY_NAME ${ARGS_GIT_REPOSITORY})
                 endif ()
         endif ()
