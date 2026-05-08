@@ -9,7 +9,15 @@ to enable its modules.
 set(CMAKE_UTILS_PATH "<...>")  # Defaults to CMAKE_BINARY_DIR/cmake-utils
 file(DOWNLOAD
         "https://raw.githubusercontent.com/stort0/cmake-utils/refs/heads/main/GetCMakeUtils.cmake"
-        "${CMAKE_BINARY_DIR}/GetCMakeUtils.cmake")
+        "${CMAKE_BINARY_DIR}/GetCMakeUtils.cmake"
+        STATUS CMAKE_UTILS_STATUS)
+
+list(GET CMAKE_UTILS_STATUS 0 CMAKE_UTILS_ERROR_CODE)
+list(GET CMAKE_UTILS_STATUS 1 CMAKE_UTILS_ERROR_MESSAGE)
+if (NOT ${CMAKE_UTILS_ERROR_CODE} STREQUAL "0")
+        message(FATAL_ERROR "Error downloading CMakeUtils:\n${CMAKE_UTILS_ERROR_MESSAGE}")
+endif ()
+
 include("${CMAKE_BINARY_DIR}/GetCMakeUtils.cmake")
 ```
 
